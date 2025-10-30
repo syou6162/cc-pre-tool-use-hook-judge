@@ -1,0 +1,14 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cc-pre-tool-use-hook-judge"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+cc-pre-tool-use-hook-judge = "src.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
