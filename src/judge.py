@@ -125,11 +125,8 @@ Input: {json.dumps(tool_input, indent=2)}"""
                     f"Failed to parse valid JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                 )
 
-        # Should never reach here as all paths return or raise
-        raise AssertionError("Unexpected: loop completed without return or raise")
-
-    # Should never reach here - async with block always returns or raises
-    raise AssertionError("Unexpected: async context exited without return or raise")
+    # This line is unreachable but required for mypy type checking
+    raise AssertionError("Unreachable code")
 
 
 def judge_pretooluse(input_data: dict[str, Any]) -> dict[str, Any]:

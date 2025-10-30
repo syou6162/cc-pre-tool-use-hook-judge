@@ -45,7 +45,7 @@ def main() -> None:
         print(json.dumps(output_data, ensure_ascii=False, indent=2))
 
     except ValueError as e:
-        # Output validation error to stderr with user-friendly message
+        # Output validation error to stdout with user-friendly message
         error_message = str(e)
         if "Failed to parse valid JSON" in error_message:
             reason = "判定システムが正しいJSON形式で応答できませんでした。安全のため操作を拒否します。"
@@ -55,13 +55,11 @@ def main() -> None:
             reason = f"入力検証エラー: {error_message}"
 
         error_output = create_error_output(reason)
-        print(json.dumps(error_output, ensure_ascii=False, indent=2), file=sys.stderr)
-        sys.exit(1)
+        print(json.dumps(error_output, ensure_ascii=False, indent=2))
     except Exception as e:
-        # Output unexpected error to stderr
+        # Output unexpected error to stdout
         error_output = create_error_output(f"予期しないエラーが発生しました: {str(e)}")
-        print(json.dumps(error_output, ensure_ascii=False, indent=2), file=sys.stderr)
-        sys.exit(1)
+        print(json.dumps(error_output, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
