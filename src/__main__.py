@@ -59,8 +59,9 @@ def main() -> None:
         # Parse command line arguments
         args = parse_args()
 
-        # Load configuration (custom prompt)
+        # Load configuration (custom prompt and model)
         custom_prompt: str | None = None
+        custom_model: str | None = None
         if args.config and args.builtin:
             # Cannot specify both --config and --builtin
             reason = "--configと--builtinの両方を指定することはできません"
@@ -71,13 +72,18 @@ def main() -> None:
             # Load external configuration
             config = load_config(args.config)
             custom_prompt = config.get("prompt")
+            custom_model = config.get("model")
         elif args.builtin:
             # Load builtin configuration
             config = load_builtin_config(args.builtin)
             custom_prompt = config.get("prompt")
+            custom_model = config.get("model")
         else:
-            # No configuration specified - use default behavior (no custom prompt)
-            custom_prompt = None
+            # No configuration specified - deny by default for security
+            reason = "設定ファイルが指定されていません。安全のため操作を拒否します。"
+            error_output = create_error_output(reason)
+            print(json.dumps(error_output, ensure_ascii=False, indent=2))
+            return
 
         # Read input from stdin
         input_json = sys.stdin.read()
@@ -88,8 +94,8 @@ def main() -> None:
         # Validate input
         input_data = validate_pretooluse_input(input_data)
 
-        # Judge the input with custom prompt
-        output_data = judge_pretooluse(input_data, prompt=custom_prompt)
+        # Judge the input with custom prompt and model
+        output_data = judge_pretooluse(input_data, prompt=custom_prompt, model=custom_model)
 
         # Output result to stdout
         print(json.dumps(output_data, ensure_ascii=False, indent=2))
