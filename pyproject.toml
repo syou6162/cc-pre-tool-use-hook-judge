@@ -16,7 +16,7 @@ dependencies = [
 cc-pre-tool-use-hook-judge = "src.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["src", "builtin_configs"]
 
 [dependency-groups]
 dev = [
