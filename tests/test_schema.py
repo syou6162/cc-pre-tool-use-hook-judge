@@ -3,7 +3,7 @@
 import json
 import pytest
 
-from src.schema import validate_pretooluse_input
+from src.schema import validate_pretooluse_input, validate_pretooluse_output
 
 
 class TestPreToolUseInputValidation:

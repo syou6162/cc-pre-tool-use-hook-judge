@@ -6,6 +6,54 @@ from typing import Any
 import jsonschema
 from jsonschema import ValidationError
 
+# PreToolUse hook output schema
+# Based on: https://docs.claude.com/en/docs/claude-code/hooks#pretooluse-decision-control
+PRETOOLUSE_OUTPUT_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["hookSpecificOutput"],
+    "properties": {
+        "hookSpecificOutput": {
+            "type": "object",
+            "required": [
+                "hookEventName",
+                "permissionDecision",
+                "permissionDecisionReason"
+            ],
+            "properties": {
+                "hookEventName": {
+                    "type": "string",
+                    "const": "PreToolUse"
+                },
+                "permissionDecision": {
+                    "type": "string",
+                    "enum": ["allow", "deny", "ask"]
+                },
+                "permissionDecisionReason": {
+                    "type": "string"
+                },
+                "updatedInput": {
+                    "type": "object"
+                }
+            },
+            "additionalProperties": False
+        },
+        "continue": {
+            "type": "boolean"
+        },
+        "stopReason": {
+            "type": "string"
+        },
+        "suppressOutput": {
+            "type": "boolean"
+        },
+        "systemMessage": {
+            "type": "string"
+        }
+    },
+    "additionalProperties": True
+}
+
 # PreToolUse hook input schema
 # Based on: https://docs.claude.com/en/docs/claude-code/hooks#pretooluse-decision-control
 PRETOOLUSE_INPUT_SCHEMA = {
