@@ -2,7 +2,11 @@
 
 import pytest
 
-from src.schema import validate_pretooluse_input, validate_pretooluse_output
+from src.schema import (
+    validate_config_yaml,
+    validate_pretooluse_input,
+    validate_pretooluse_output,
+)
 
 
 class TestPreToolUseInputValidation:

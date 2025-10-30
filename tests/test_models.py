@@ -2,7 +2,6 @@
 
 from typing import get_type_hints
 
-import pytest
 
 from src.models import ConfigDict
 

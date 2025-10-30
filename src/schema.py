@@ -108,6 +108,39 @@ def _validate_with_schema(data: dict[str, Any], schema: dict[str, Any]) -> dict[
     return data
 
 
+# YAML configuration schema
+# Used to validate external YAML configuration files for validators
+CONFIG_YAML_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["prompt"],
+    "properties": {
+        "prompt": {
+            "type": "string",
+            "description": "The validation prompt to append to the system prompt"
+        },
+        "model": {
+            "type": "string",
+            "description": "The Claude model to use for validation",
+            "enum": [
+                "claude-opus-4-20250514",
+                "claude-sonnet-4-20250514",
+                "claude-haiku-4-20250514"
+            ]
+        },
+        "allowed_tools": {
+            "type": "array",
+            "description": "List of allowed tool names for the validator",
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "additionalProperties": False
+}
+
+
 # Create schema-specific validators using partial application
 validate_pretooluse_input = partial(_validate_with_schema, schema=PRETOOLUSE_INPUT_SCHEMA)
 validate_pretooluse_output = partial(_validate_with_schema, schema=PRETOOLUSE_OUTPUT_SCHEMA)
+validate_config_yaml = partial(_validate_with_schema, schema=CONFIG_YAML_SCHEMA)
