@@ -122,10 +122,24 @@ Input: {json.dumps(tool_input, indent=2)}"""
         system_prompt = SYSTEM_PROMPT
     else:
         # Use SystemPromptPreset when custom prompt is provided
+        # Add JSON output instructions to custom prompt
+        json_instructions = f"""
+
+# Output JSON Schema
+{json.dumps(PRETOOLUSE_OUTPUT_SCHEMA, indent=2)}
+
+IMPORTANT: Return ONLY raw JSON. Do NOT wrap it in markdown code blocks (```json or ```).
+
+Return ONLY a valid JSON matching the output schema, with:
+- permissionDecision: "allow", "deny", or "ask"
+- permissionDecisionReason: A brief explanation
+
+Output JSON only, no other text, no code blocks, no formatting."""
+
         system_prompt = SystemPromptPreset(
             type="preset",
             preset="claude_code",
-            append=prompt
+            append=prompt + json_instructions
         )
 
     # Configure Claude Agent options with retry support
