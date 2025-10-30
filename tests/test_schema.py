@@ -120,3 +120,119 @@ class TestPreToolUseInputValidation:
         """真偽値文字列に対してエラーを返すことを確認"""
         with pytest.raises(ValueError):
             validate_pretooluse_input("true")
+
+
+class TestPreToolUseOutputValidation:
+    """Test PreToolUse output JSON validation."""
+
+    def test_valid_output_with_allow_decision(self) -> None:
+        """permissionDecisionがallowの有効な出力に対してバリデーションが成功することを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "This is a safe operation"
+            }
+        }
+
+        result = validate_pretooluse_output(json.dumps(output_data))
+        assert result == output_data
+
+    def test_valid_output_with_deny_decision(self) -> None:
+        """permissionDecisionがdenyの有効な出力に対してバリデーションが成功することを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "This operation is not allowed"
+            }
+        }
+
+        result = validate_pretooluse_output(json.dumps(output_data))
+        assert result == output_data
+
+    def test_valid_output_with_ask_decision(self) -> None:
+        """permissionDecisionがaskの有効な出力に対してバリデーションが成功することを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "ask",
+                "permissionDecisionReason": "User confirmation required"
+            }
+        }
+
+        result = validate_pretooluse_output(json.dumps(output_data))
+        assert result == output_data
+
+    def test_valid_output_with_updated_input(self) -> None:
+        """updatedInputを含む有効な出力に対してバリデーションが成功することを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "Modified input",
+                "updatedInput": {
+                    "file_path": "/modified/path.txt"
+                }
+            }
+        }
+
+        result = validate_pretooluse_output(json.dumps(output_data))
+        assert result == output_data
+
+    def test_invalid_permission_decision_value(self) -> None:
+        """permissionDecisionが不正な値の場合にエラーを返すことを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "maybe",
+                "permissionDecisionReason": "Unsure"
+            }
+        }
+
+        with pytest.raises(ValueError):
+            validate_pretooluse_output(json.dumps(output_data))
+
+    def test_missing_hook_specific_output(self) -> None:
+        """hookSpecificOutputが欠けている場合にエラーを返すことを確認"""
+        output_data = {}
+
+        with pytest.raises(ValueError, match="hookSpecificOutput"):
+            validate_pretooluse_output(json.dumps(output_data))
+
+    def test_missing_permission_decision(self) -> None:
+        """permissionDecisionが欠けている場合にエラーを返すことを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecisionReason": "Reason"
+            }
+        }
+
+        with pytest.raises(ValueError, match="permissionDecision"):
+            validate_pretooluse_output(json.dumps(output_data))
+
+    def test_missing_permission_decision_reason(self) -> None:
+        """permissionDecisionReasonが欠けている場合にエラーを返すことを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow"
+            }
+        }
+
+        with pytest.raises(ValueError, match="permissionDecisionReason"):
+            validate_pretooluse_output(json.dumps(output_data))
+
+    def test_invalid_hook_event_name_in_output(self) -> None:
+        """hookEventNameが不正な値の場合にエラーを返すことを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "Reason"
+            }
+        }
+
+        with pytest.raises(ValueError, match="PreToolUse"):
+            validate_pretooluse_output(json.dumps(output_data))

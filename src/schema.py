@@ -87,6 +87,32 @@ PRETOOLUSE_INPUT_SCHEMA = {
 }
 
 
+def validate_pretooluse_output(json_string: str) -> dict[str, Any]:
+    """Validate PreToolUse hook output JSON using JSON Schema.
+
+    Args:
+        json_string: JSON string to validate
+
+    Returns:
+        Parsed and validated output data as dictionary
+
+    Raises:
+        json.JSONDecodeError: If json_string is not valid JSON
+        ValueError: If required fields are missing or invalid
+    """
+    # Parse JSON
+    data = json.loads(json_string)
+
+    # Validate using JSON Schema
+    try:
+        jsonschema.validate(instance=data, schema=PRETOOLUSE_OUTPUT_SCHEMA)
+    except ValidationError as e:
+        # Convert jsonschema.ValidationError to ValueError for consistency
+        raise ValueError(str(e.message)) from e
+
+    return data
+
+
 def validate_pretooluse_input(json_string: str) -> dict[str, Any]:
     """Validate PreToolUse hook input JSON using JSON Schema.
 
