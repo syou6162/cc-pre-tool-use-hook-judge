@@ -10,6 +10,7 @@ from claude_agent_sdk import (
     ClaudeSDKClient,
     TextBlock,
 )
+from claude_agent_sdk.types import SystemPromptPreset
 
 from src.constants import (
     DEFAULT_PERMISSION_DECISION,
@@ -112,15 +113,16 @@ Tool: {tool_name}
 Input: {json.dumps(tool_input, indent=2)}"""
 
     # Determine system prompt based on whether custom prompt is provided
+    system_prompt: str | SystemPromptPreset
     if prompt is None:
         system_prompt = SYSTEM_PROMPT
     else:
         # Use SystemPromptPreset when custom prompt is provided
-        system_prompt = {
-            "type": "preset",
-            "preset": "claude_code",
-            "append": prompt
-        }
+        system_prompt = SystemPromptPreset(
+            type="preset",
+            preset="claude_code",
+            append=prompt
+        )
 
     # Configure Claude Agent options with retry support
     options = ClaudeAgentOptions(
