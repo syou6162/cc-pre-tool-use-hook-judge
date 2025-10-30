@@ -89,7 +89,7 @@ def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:
     return output_data
 
 
-async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None) -> dict[str, Any]:
+async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (async).
 
     Args:
@@ -98,6 +98,8 @@ async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None 
                 If None, uses SYSTEM_PROMPT as-is.
         model: Optional model name to use for the judgment.
                If None, uses the default model.
+        allowed_tools: Optional list of allowed tool names for Claude Agent SDK.
+                       If None, uses the default allowed tools.
 
     Returns:
         PreToolUse hook output dictionary
@@ -131,6 +133,7 @@ Input: {json.dumps(tool_input, indent=2)}"""
         system_prompt=system_prompt,
         max_turns=MAX_RETRY_ATTEMPTS,
         model=model,
+        allowed_tools=allowed_tools if allowed_tools is not None else [],
     )
 
     # Use ClaudeSDKClient for bidirectional conversation
@@ -188,7 +191,7 @@ Input: {json.dumps(tool_input, indent=2)}"""
     raise AssertionError("Unreachable code")
 
 
-def judge_pretooluse(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None) -> dict[str, Any]:
+def judge_pretooluse(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (sync wrapper).
 
     Args:
@@ -197,6 +200,8 @@ def judge_pretooluse(input_data: dict[str, Any], prompt: str | None = None, mode
                 If None, uses SYSTEM_PROMPT as-is.
         model: Optional model name to use for the judgment.
                If None, uses the default model.
+        allowed_tools: Optional list of allowed tool names for Claude Agent SDK.
+                       If None, uses the default allowed tools.
 
     Returns:
         PreToolUse hook output dictionary
@@ -204,4 +209,4 @@ def judge_pretooluse(input_data: dict[str, Any], prompt: str | None = None, mode
     Raises:
         ValueError: If JSON parsing fails after retries
     """
-    return anyio.run(judge_pretooluse_async, input_data, prompt, model)
+    return anyio.run(judge_pretooluse_async, input_data, prompt, model, allowed_tools)

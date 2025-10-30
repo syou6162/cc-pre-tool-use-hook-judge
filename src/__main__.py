@@ -59,9 +59,10 @@ def main() -> None:
         # Parse command line arguments
         args = parse_args()
 
-        # Load configuration (custom prompt and model)
+        # Load configuration (custom prompt, model, and allowed_tools)
         custom_prompt: str | None = None
         custom_model: str | None = None
+        custom_allowed_tools: list[str] | None = None
         if args.config and args.builtin:
             # Cannot specify both --config and --builtin
             reason = "--configと--builtinの両方を指定することはできません"
@@ -73,11 +74,13 @@ def main() -> None:
             config = load_config(args.config)
             custom_prompt = config.get("prompt")
             custom_model = config.get("model")
+            custom_allowed_tools = config.get("allowed_tools")
         elif args.builtin:
             # Load builtin configuration
             config = load_builtin_config(args.builtin)
             custom_prompt = config.get("prompt")
             custom_model = config.get("model")
+            custom_allowed_tools = config.get("allowed_tools")
         else:
             # No configuration specified - deny by default for security
             reason = "設定ファイルが指定されていません。安全のため操作を拒否します。"
@@ -94,8 +97,8 @@ def main() -> None:
         # Validate input
         input_data = validate_pretooluse_input(input_data)
 
-        # Judge the input with custom prompt and model
-        output_data = judge_pretooluse(input_data, prompt=custom_prompt, model=custom_model)
+        # Judge the input with custom prompt, model, and allowed_tools
+        output_data = judge_pretooluse(input_data, prompt=custom_prompt, model=custom_model, allowed_tools=custom_allowed_tools)
 
         # Output result to stdout
         print(json.dumps(output_data, ensure_ascii=False, indent=2))
