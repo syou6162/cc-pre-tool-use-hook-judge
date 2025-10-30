@@ -1,0 +1,1 @@
+# cc-pre-tool-use-hook-judge
