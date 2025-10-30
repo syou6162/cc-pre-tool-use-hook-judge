@@ -17,6 +17,7 @@ from src.constants import (
     HOOK_EVENT_NAME,
     MAX_RETRY_ATTEMPTS,
 )
+from src.exceptions import InvalidJSONError, NoResponseError, SchemaValidationError
 from src.schema import (
     PRETOOLUSE_INPUT_SCHEMA,
     PRETOOLUSE_OUTPUT_SCHEMA,
@@ -130,7 +131,9 @@ Input: {json.dumps(tool_input, indent=2)}"""
                         "Please provide a response in valid JSON format."
                     )
                     continue
-                raise ValueError("No response received from Claude Agent SDK")
+                raise NoResponseError(
+                    f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
+                )
 
             # Try to parse JSON and validate output
             try:
@@ -148,7 +151,7 @@ Input: {json.dumps(tool_input, indent=2)}"""
                         "Please return ONLY raw JSON without any markdown formatting or code blocks."
                     )
                     continue
-                raise ValueError(
+                raise InvalidJSONError(
                     f"Failed to parse valid JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                 )
             except ValueError as e:
@@ -159,7 +162,7 @@ Input: {json.dumps(tool_input, indent=2)}"""
                         "Please return a valid response matching the output schema."
                     )
                     continue
-                raise ValueError(
+                raise SchemaValidationError(
                     f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                 )
 

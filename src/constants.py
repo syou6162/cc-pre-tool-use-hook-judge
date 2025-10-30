@@ -14,7 +14,3 @@ DEFAULT_PERMISSION_REASON = "Invalid or missing permission decision from judgmen
 
 # Maximum number of retry attempts for JSON parsing
 MAX_RETRY_ATTEMPTS = 3
-
-# Error message patterns for classification
-ERROR_PATTERN_INVALID_JSON = "Failed to parse valid JSON"
-ERROR_PATTERN_NO_RESPONSE = "No response received"
