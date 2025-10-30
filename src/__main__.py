@@ -45,6 +45,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Path to external YAML configuration file"
     )
+    parser.add_argument(
+        "--builtin",
+        type=str,
+        help="Name of builtin configuration to use"
+    )
     return parser.parse_args()
 
 
@@ -56,14 +61,23 @@ def main() -> None:
 
         # Load configuration (custom prompt)
         custom_prompt: str | None = None
-        if args.config:
+        if args.config and args.builtin:
+            # Cannot specify both --config and --builtin
+            reason = "--configと--builtinの両方を指定することはできません"
+            error_output = create_error_output(reason)
+            print(json.dumps(error_output, ensure_ascii=False, indent=2))
+            return
+        elif args.config:
             # Load external configuration
             config = load_config(args.config)
             custom_prompt = config.get("prompt")
-        else:
+        elif args.builtin:
             # Load builtin configuration
-            config = load_builtin_config("validate_bq_query")
+            config = load_builtin_config(args.builtin)
             custom_prompt = config.get("prompt")
+        else:
+            # No configuration specified - use default behavior (no custom prompt)
+            custom_prompt = None
 
         # Read input from stdin
         input_json = sys.stdin.read()
