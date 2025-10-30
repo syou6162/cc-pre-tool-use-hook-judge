@@ -61,7 +61,7 @@ Input: {json.dumps(tool_input, indent=2)}"""
     # Configure Claude Agent options
     options = ClaudeAgentOptions(
         system_prompt=SYSTEM_PROMPT,
-        max_turns=1,  # Single-turn judgment
+        max_turns=1,  # Single-turn judgment for now
     )
 
     # Call Claude Agent SDK for judgment
