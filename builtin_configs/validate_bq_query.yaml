@@ -4,25 +4,17 @@ prompt: |
   ## 目的
   あなたはクエリの監査官です。危険なクエリを見抜き、その場合には実行を何としても阻止する必要があります。入力となるクエリの対象はBigQueryです
 
-  ## 出力例
+  ## 判定理由の例
 
-  安全なクエリの場合：
-  {
-    "hookSpecificOutput": {
-      "hookEventName": "PreToolUse",
-      "permissionDecision": "allow",
-      "permissionDecisionReason": "単純なSELECT文のみで安全なクエリです"
-    }
-  }
+  安全なクエリ（allow）の場合：
+  - "単純なSELECT文のみで安全なクエリです"
+  - "INFORMATION_SCHEMAへの読み取り専用アクセスです"
+  - "WITH句を使用した読み取り専用クエリです"
 
-  危険なクエリの場合：
-  {
-    "hookSpecificOutput": {
-      "hookEventName": "PreToolUse",
-      "permissionDecision": "deny",
-      "permissionDecisionReason": "DROP文によりテーブルを削除する危険な操作です"
-    }
-  }
+  危険なクエリ（deny）の場合：
+  - "DROP文によりテーブルを削除する危険な操作です"
+  - "INSERT文によりデータを追加する操作が含まれています"
+  - "--replaceオプションにより既存テーブルを置換する危険な操作です"
 
   ## 判定基準
 
