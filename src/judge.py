@@ -88,11 +88,13 @@ def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:
     return output_data
 
 
-async def judge_pretooluse_async(input_data: dict[str, Any]) -> dict[str, Any]:
+async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (async).
 
     Args:
         input_data: Validated PreToolUse hook input dictionary
+        prompt: Optional custom prompt to append to the default system prompt.
+                If None, uses SYSTEM_PROMPT as-is.
 
     Returns:
         PreToolUse hook output dictionary
@@ -105,19 +107,30 @@ async def judge_pretooluse_async(input_data: dict[str, Any]) -> dict[str, Any]:
     tool_input = input_data["tool_input"]
 
     # Create user prompt with current tool usage
-    prompt = f"""# Current Tool Usage
+    user_prompt = f"""# Current Tool Usage
 Tool: {tool_name}
 Input: {json.dumps(tool_input, indent=2)}"""
 
+    # Determine system prompt based on whether custom prompt is provided
+    if prompt is None:
+        system_prompt = SYSTEM_PROMPT
+    else:
+        # Use SystemPromptPreset when custom prompt is provided
+        system_prompt = {
+            "type": "preset",
+            "preset": "claude_code",
+            "append": prompt
+        }
+
     # Configure Claude Agent options with retry support
     options = ClaudeAgentOptions(
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         max_turns=MAX_RETRY_ATTEMPTS,
     )
 
     # Use ClaudeSDKClient for bidirectional conversation
     async with ClaudeSDKClient(options=options) as client:
-        await client.query(prompt)
+        await client.query(user_prompt)
 
         # Try to get valid JSON response with retry
         for attempt in range(MAX_RETRY_ATTEMPTS):
@@ -170,11 +183,13 @@ Input: {json.dumps(tool_input, indent=2)}"""
     raise AssertionError("Unreachable code")
 
 
-def judge_pretooluse(input_data: dict[str, Any]) -> dict[str, Any]:
+def judge_pretooluse(input_data: dict[str, Any], prompt: str | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (sync wrapper).
 
     Args:
         input_data: Validated PreToolUse hook input dictionary
+        prompt: Optional custom prompt to append to the default system prompt.
+                If None, uses SYSTEM_PROMPT as-is.
 
     Returns:
         PreToolUse hook output dictionary
@@ -182,4 +197,4 @@ def judge_pretooluse(input_data: dict[str, Any]) -> dict[str, Any]:
     Raises:
         ValueError: If JSON parsing fails after retries
     """
-    return anyio.run(judge_pretooluse_async, input_data)
+    return anyio.run(judge_pretooluse_async, input_data, prompt)
