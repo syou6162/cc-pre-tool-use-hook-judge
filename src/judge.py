@@ -14,7 +14,6 @@ from claude_agent_sdk import (
 from src.schema import (
     PRETOOLUSE_INPUT_SCHEMA,
     PRETOOLUSE_OUTPUT_SCHEMA,
-    validate_pretooluse_input,
 )
 
 # Maximum number of retry attempts for JSON parsing
@@ -42,21 +41,18 @@ Return ONLY a valid JSON matching the output schema, with:
 Output JSON only, no other text, no code blocks, no formatting."""
 
 
-async def judge_pretooluse_async(input_json: str) -> dict[str, Any]:
+async def judge_pretooluse_async(input_data: dict[str, Any]) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (async).
 
     Args:
-        input_json: PreToolUse hook input as JSON string
+        input_data: Validated PreToolUse hook input dictionary
 
     Returns:
         PreToolUse hook output dictionary
 
     Raises:
-        ValueError: If input validation fails or JSON parsing fails after retries
+        ValueError: If JSON parsing fails after retries
     """
-    # Validate input
-    input_data = validate_pretooluse_input(input_json)
-
     # Extract tool information
     tool_name = input_data["tool_name"]
     tool_input = input_data["tool_input"]
@@ -136,16 +132,16 @@ Input: {json.dumps(tool_input, indent=2)}"""
     raise AssertionError("Unexpected: async context exited without return or raise")
 
 
-def judge_pretooluse(input_json: str) -> dict[str, Any]:
+def judge_pretooluse(input_data: dict[str, Any]) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (sync wrapper).
 
     Args:
-        input_json: PreToolUse hook input as JSON string
+        input_data: Validated PreToolUse hook input dictionary
 
     Returns:
         PreToolUse hook output dictionary
 
     Raises:
-        ValueError: If input validation fails
+        ValueError: If JSON parsing fails after retries
     """
-    return anyio.run(judge_pretooluse_async, input_json)
+    return anyio.run(judge_pretooluse_async, input_data)

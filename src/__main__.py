@@ -32,8 +32,11 @@ def main() -> None:
         # Read input from stdin
         input_json = sys.stdin.read()
 
+        # Validate input
+        input_data = validate_pretooluse_input(input_json)
+
         # Judge the input
-        output_data = judge_pretooluse(input_json)
+        output_data = judge_pretooluse(input_data)
 
         # Output result to stdout
         print(json.dumps(output_data, ensure_ascii=False, indent=2))
