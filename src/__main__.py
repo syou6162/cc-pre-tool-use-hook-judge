@@ -2,8 +2,28 @@
 
 import json
 import sys
+from typing import Any
 
 from src.judge import judge_pretooluse
+from src.schema import validate_pretooluse_input
+
+
+def create_error_output(reason: str) -> dict[str, Any]:
+    """Create error output in PreToolUse hook format.
+
+    Args:
+        reason: The reason for denying the operation
+
+    Returns:
+        Error output dictionary with deny decision
+    """
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
 
 
 def main() -> None:
@@ -28,24 +48,12 @@ def main() -> None:
         else:
             reason = f"入力検証エラー: {error_message}"
 
-        error_output = {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": reason,
-            }
-        }
+        error_output = create_error_output(reason)
         print(json.dumps(error_output, ensure_ascii=False, indent=2), file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         # Output unexpected error to stderr
-        error_output = {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": f"予期しないエラーが発生しました: {str(e)}",
-            }
-        }
+        error_output = create_error_output(f"予期しないエラーが発生しました: {str(e)}")
         print(json.dumps(error_output, ensure_ascii=False, indent=2), file=sys.stderr)
         sys.exit(1)
 
