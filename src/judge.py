@@ -20,6 +20,7 @@ from src.constants import (
 from src.schema import (
     PRETOOLUSE_INPUT_SCHEMA,
     PRETOOLUSE_OUTPUT_SCHEMA,
+    validate_pretooluse_output,
 )
 
 # System prompt with JSON schemas
@@ -131,23 +132,35 @@ Input: {json.dumps(tool_input, indent=2)}"""
                     continue
                 raise ValueError("No response received from Claude Agent SDK")
 
-            # Try to parse JSON
+            # Try to parse JSON and validate output
             try:
                 output_data = json.loads(response_text)
                 output_data = _wrap_output_if_needed(output_data)
+                # Validate output against schema
+                validate_pretooluse_output(output_data)
                 return output_data
 
             except json.JSONDecodeError as e:
-                # If this is not the last attempt, ask for correction
+                # JSON parsing failed
                 if attempt < MAX_RETRY_ATTEMPTS - 1:
                     await client.query(
                         f"Your previous response was not valid JSON. Error: {str(e)}. "
                         "Please return ONLY raw JSON without any markdown formatting or code blocks."
                     )
                     continue
-                # Last attempt failed
                 raise ValueError(
                     f"Failed to parse valid JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
+                )
+            except ValueError as e:
+                # Schema validation failed
+                if attempt < MAX_RETRY_ATTEMPTS - 1:
+                    await client.query(
+                        f"Your previous response did not match the required schema. Error: {str(e)}. "
+                        "Please return a valid response matching the output schema."
+                    )
+                    continue
+                raise ValueError(
+                    f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                 )
 
     # This line is unreachable but required for mypy type checking
