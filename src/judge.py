@@ -11,20 +11,16 @@ from claude_agent_sdk import (
     TextBlock,
 )
 
+from src.constants import (
+    DEFAULT_PERMISSION_DECISION,
+    DEFAULT_PERMISSION_REASON,
+    HOOK_EVENT_NAME,
+    MAX_RETRY_ATTEMPTS,
+)
 from src.schema import (
     PRETOOLUSE_INPUT_SCHEMA,
     PRETOOLUSE_OUTPUT_SCHEMA,
 )
-
-# Maximum number of retry attempts for JSON parsing
-MAX_RETRY_ATTEMPTS = 3
-
-# Default permission decision values
-DEFAULT_PERMISSION_DECISION = "allow"
-DEFAULT_PERMISSION_REASON = "Operation allowed"
-
-# Hook event name constant
-HOOK_EVENT_NAME = "PreToolUse"
 
 # System prompt with JSON schemas
 SYSTEM_PROMPT = f"""You are a PreToolUse hook validator for Claude Code.
@@ -46,6 +42,48 @@ Return ONLY a valid JSON matching the output schema, with:
 - permissionDecisionReason: A brief explanation
 
 Output JSON only, no other text, no code blocks, no formatting."""
+
+
+async def _receive_text_response(client: ClaudeSDKClient) -> str:
+    """Receive text response from Claude Agent SDK.
+
+    Args:
+        client: Claude SDK client instance
+
+    Returns:
+        Combined text from all text blocks in the response
+    """
+    response_text = ""
+    async for message in client.receive_response():
+        if isinstance(message, AssistantMessage):
+            for block in message.content:
+                if isinstance(block, TextBlock):
+                    response_text += block.text
+    return response_text
+
+
+def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:
+    """Wrap output data in hookSpecificOutput format if not already wrapped.
+
+    Args:
+        output_data: Raw output data from Claude Agent SDK
+
+    Returns:
+        Output data wrapped in hookSpecificOutput format
+    """
+    if "hookSpecificOutput" not in output_data:
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": HOOK_EVENT_NAME,
+                "permissionDecision": output_data.get(
+                    "permissionDecision", DEFAULT_PERMISSION_DECISION
+                ),
+                "permissionDecisionReason": output_data.get(
+                    "permissionDecisionReason", DEFAULT_PERMISSION_REASON
+                ),
+            }
+        }
+    return output_data
 
 
 async def judge_pretooluse_async(input_data: dict[str, Any]) -> dict[str, Any]:
@@ -81,14 +119,8 @@ Input: {json.dumps(tool_input, indent=2)}"""
 
         # Try to get valid JSON response with retry
         for attempt in range(MAX_RETRY_ATTEMPTS):
-            response_text = ""
-
             # Receive response
-            async for message in client.receive_response():
-                if isinstance(message, AssistantMessage):
-                    for block in message.content:
-                        if isinstance(block, TextBlock):
-                            response_text += block.text
+            response_text = await _receive_text_response(client)
 
             # Check if we got any response
             if not response_text:
@@ -102,21 +134,7 @@ Input: {json.dumps(tool_input, indent=2)}"""
             # Try to parse JSON
             try:
                 output_data = json.loads(response_text)
-
-                # Wrap in hookSpecificOutput if not already wrapped
-                if "hookSpecificOutput" not in output_data:
-                    output_data = {
-                        "hookSpecificOutput": {
-                            "hookEventName": HOOK_EVENT_NAME,
-                            "permissionDecision": output_data.get(
-                                "permissionDecision", DEFAULT_PERMISSION_DECISION
-                            ),
-                            "permissionDecisionReason": output_data.get(
-                                "permissionDecisionReason", DEFAULT_PERMISSION_REASON
-                            ),
-                        }
-                    }
-
+                output_data = _wrap_output_if_needed(output_data)
                 return output_data
 
             except json.JSONDecodeError as e:

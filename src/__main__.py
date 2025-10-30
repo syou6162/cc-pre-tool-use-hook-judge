@@ -4,16 +4,14 @@ import json
 import sys
 from typing import Any
 
+from src.constants import (
+    ERROR_PATTERN_INVALID_JSON,
+    ERROR_PATTERN_NO_RESPONSE,
+    HOOK_EVENT_NAME,
+    PERMISSION_DENY,
+)
 from src.judge import judge_pretooluse
 from src.schema import validate_pretooluse_input
-
-# Constants for hook output
-HOOK_EVENT_NAME = "PreToolUse"
-PERMISSION_DENY = "deny"
-
-# Error message patterns for classification
-ERROR_PATTERN_INVALID_JSON = "Failed to parse valid JSON"
-ERROR_PATTERN_NO_RESPONSE = "No response received"
 
 
 def create_error_output(reason: str) -> dict[str, Any]:
