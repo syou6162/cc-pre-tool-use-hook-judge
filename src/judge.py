@@ -25,11 +25,13 @@ Your task is to validate tool usage and return a decision.
 
 For now, always return a decision to ALLOW the operation with a simple reason.
 
+IMPORTANT: Return ONLY raw JSON. Do NOT wrap it in markdown code blocks (```json or ```).
+
 Return ONLY a valid JSON matching the output schema, with:
 - permissionDecision: "allow"
 - permissionDecisionReason: A brief explanation
 
-Output JSON only, no other text."""
+Output JSON only, no other text, no code blocks, no formatting."""
 
 
 async def judge_pretooluse_async(input_json: str) -> dict[str, Any]:
@@ -42,7 +44,7 @@ async def judge_pretooluse_async(input_json: str) -> dict[str, Any]:
         PreToolUse hook output dictionary
 
     Raises:
-        ValueError: If input validation fails
+        ValueError: If input validation fails or JSON parsing fails after retries
     """
     # Validate input
     input_data = validate_pretooluse_input(input_json)
@@ -69,6 +71,10 @@ Input: {json.dumps(tool_input, indent=2)}"""
             for block in message.content:
                 if isinstance(block, TextBlock):
                     response_text += block.text
+
+    # Check if we got any response
+    if not response_text:
+        raise ValueError("No response received from Claude Agent SDK")
 
     # Parse and validate output
     output_data = json.loads(response_text)
