@@ -7,6 +7,14 @@ from typing import Any
 from src.judge import judge_pretooluse
 from src.schema import validate_pretooluse_input
 
+# Constants for hook output
+HOOK_EVENT_NAME = "PreToolUse"
+PERMISSION_DENY = "deny"
+
+# Error message patterns for classification
+ERROR_PATTERN_INVALID_JSON = "Failed to parse valid JSON"
+ERROR_PATTERN_NO_RESPONSE = "No response received"
+
 
 def create_error_output(reason: str) -> dict[str, Any]:
     """Create error output in PreToolUse hook format.
@@ -19,8 +27,8 @@ def create_error_output(reason: str) -> dict[str, Any]:
     """
     return {
         "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
+            "hookEventName": HOOK_EVENT_NAME,
+            "permissionDecision": PERMISSION_DENY,
             "permissionDecisionReason": reason,
         }
     }
@@ -47,9 +55,9 @@ def main() -> None:
     except ValueError as e:
         # Output validation error to stdout with user-friendly message
         error_message = str(e)
-        if "Failed to parse valid JSON" in error_message:
+        if ERROR_PATTERN_INVALID_JSON in error_message:
             reason = "判定システムが正しいJSON形式で応答できませんでした。安全のため操作を拒否します。"
-        elif "No response received" in error_message:
+        elif ERROR_PATTERN_NO_RESPONSE in error_message:
             reason = "判定システムから応答がありませんでした。安全のため操作を拒否します。"
         else:
             reason = f"入力検証エラー: {error_message}"

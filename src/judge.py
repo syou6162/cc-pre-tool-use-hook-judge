@@ -19,6 +19,13 @@ from src.schema import (
 # Maximum number of retry attempts for JSON parsing
 MAX_RETRY_ATTEMPTS = 3
 
+# Default permission decision values
+DEFAULT_PERMISSION_DECISION = "allow"
+DEFAULT_PERMISSION_REASON = "Operation allowed"
+
+# Hook event name constant
+HOOK_EVENT_NAME = "PreToolUse"
+
 # System prompt with JSON schemas
 SYSTEM_PROMPT = f"""You are a PreToolUse hook validator for Claude Code.
 
@@ -100,12 +107,12 @@ Input: {json.dumps(tool_input, indent=2)}"""
                 if "hookSpecificOutput" not in output_data:
                     output_data = {
                         "hookSpecificOutput": {
-                            "hookEventName": "PreToolUse",
+                            "hookEventName": HOOK_EVENT_NAME,
                             "permissionDecision": output_data.get(
-                                "permissionDecision", "allow"
+                                "permissionDecision", DEFAULT_PERMISSION_DECISION
                             ),
                             "permissionDecisionReason": output_data.get(
-                                "permissionDecisionReason", "Operation allowed"
+                                "permissionDecisionReason", DEFAULT_PERMISSION_REASON
                             ),
                         }
                     }
