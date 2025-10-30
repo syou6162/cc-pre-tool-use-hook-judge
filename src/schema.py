@@ -1,6 +1,6 @@
 """JSON schema validation for PreToolUse hook inputs and outputs."""
 
-import json
+from functools import partial
 from typing import Any
 
 import jsonschema
@@ -87,53 +87,27 @@ PRETOOLUSE_INPUT_SCHEMA = {
 }
 
 
-def validate_pretooluse_output(json_string: str) -> dict[str, Any]:
-    """Validate PreToolUse hook output JSON using JSON Schema.
+def _validate_with_schema(data: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
+    """Validate data against a JSON schema.
 
     Args:
-        json_string: JSON string to validate
+        data: Dictionary to validate
+        schema: JSON schema to validate against
 
     Returns:
-        Parsed and validated output data as dictionary
+        The validated data dictionary (unchanged)
 
     Raises:
-        json.JSONDecodeError: If json_string is not valid JSON
-        ValueError: If required fields are missing or invalid
+        ValueError: If validation fails
     """
-    # Parse JSON
-    data = json.loads(json_string)
-
-    # Validate using JSON Schema
     try:
-        jsonschema.validate(instance=data, schema=PRETOOLUSE_OUTPUT_SCHEMA)
+        jsonschema.validate(instance=data, schema=schema)
     except ValidationError as e:
         # Convert jsonschema.ValidationError to ValueError for consistency
         raise ValueError(str(e.message)) from e
-
     return data
 
 
-def validate_pretooluse_input(json_string: str) -> dict[str, Any]:
-    """Validate PreToolUse hook input JSON using JSON Schema.
-
-    Args:
-        json_string: JSON string to validate
-
-    Returns:
-        Parsed and validated input data as dictionary
-
-    Raises:
-        json.JSONDecodeError: If json_string is not valid JSON
-        ValueError: If required fields are missing or invalid
-    """
-    # Parse JSON
-    data = json.loads(json_string)
-
-    # Validate using JSON Schema
-    try:
-        jsonschema.validate(instance=data, schema=PRETOOLUSE_INPUT_SCHEMA)
-    except ValidationError as e:
-        # Convert jsonschema.ValidationError to ValueError for consistency
-        raise ValueError(str(e.message)) from e
-
-    return data
+# Create schema-specific validators using partial application
+validate_pretooluse_input = partial(_validate_with_schema, schema=PRETOOLUSE_INPUT_SCHEMA)
+validate_pretooluse_output = partial(_validate_with_schema, schema=PRETOOLUSE_OUTPUT_SCHEMA)
