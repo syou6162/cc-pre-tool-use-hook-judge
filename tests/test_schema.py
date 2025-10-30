@@ -195,7 +195,7 @@ class TestPreToolUseOutputValidation:
 
     def test_missing_hook_specific_output(self) -> None:
         """hookSpecificOutputが欠けている場合にエラーを返すことを確認"""
-        output_data = {}
+        output_data: dict[str, object] = {}
 
         with pytest.raises(ValueError, match="hookSpecificOutput"):
             validate_pretooluse_output(json.dumps(output_data))
