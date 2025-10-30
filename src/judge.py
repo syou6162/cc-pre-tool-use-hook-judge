@@ -143,12 +143,17 @@ Output JSON only, no other text, no code blocks, no formatting."""
         )
 
     # Configure Claude Agent options with retry support
-    options = ClaudeAgentOptions(
-        system_prompt=system_prompt,
-        max_turns=MAX_RETRY_ATTEMPTS,
-        model=model,
-        allowed_tools=allowed_tools if allowed_tools is not None else [],
-    )
+    # Note: Only pass allowed_tools if explicitly set (not None) to preserve SDK defaults
+    options_dict: dict[str, Any] = {
+        "system_prompt": system_prompt,
+        "max_turns": MAX_RETRY_ATTEMPTS,
+    }
+    if model is not None:
+        options_dict["model"] = model
+    if allowed_tools is not None:
+        options_dict["allowed_tools"] = allowed_tools
+
+    options = ClaudeAgentOptions(**options_dict)
 
     # Use ClaudeSDKClient for bidirectional conversation
     async with ClaudeSDKClient(options=options) as client:
