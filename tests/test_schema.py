@@ -267,6 +267,36 @@ class TestConfigYamlValidation:
         result = validate_config_yaml(config_data)
         assert result == config_data
 
+    def test_valid_config_with_model_alias(self) -> None:
+        """短縮形エイリアス（claude-sonnet-4-5）を持つ有効な設定に対してバリデーションが成功することを確認"""
+        config_data = {
+            "prompt": "Validate queries",
+            "model": "claude-sonnet-4-5"
+        }
+
+        result = validate_config_yaml(config_data)
+        assert result == config_data
+
+    def test_valid_config_with_haiku_alias(self) -> None:
+        """haiku短縮形エイリアス（claude-haiku-4-5）を持つ有効な設定に対してバリデーションが成功することを確認"""
+        config_data = {
+            "prompt": "Validate queries",
+            "model": "claude-haiku-4-5"
+        }
+
+        result = validate_config_yaml(config_data)
+        assert result == config_data
+
+    def test_valid_config_with_latest_alias(self) -> None:
+        """latestエイリアス（claude-3-7-sonnet-latest）を持つ有効な設定に対してバリデーションが成功することを確認"""
+        config_data = {
+            "prompt": "Validate queries",
+            "model": "claude-3-7-sonnet-latest"
+        }
+
+        result = validate_config_yaml(config_data)
+        assert result == config_data
+
     def test_valid_config_with_allowed_tools_field(self) -> None:
         """promptとallowed_toolsフィールドを持つ有効な設定に対してバリデーションが成功することを確認"""
         config_data = {
@@ -315,6 +345,56 @@ class TestConfigYamlValidation:
         config_data = {
             "prompt": "Valid prompt",
             "model": ["not", "a", "string"]  # 配列は不正
+        }
+
+        with pytest.raises(ValueError):
+            validate_config_yaml(config_data)
+
+    def test_valid_config_with_short_sonnet(self) -> None:
+        """短縮形エイリアス（sonnet）を持つ有効な設定に対してバリデーションが成功することを確認"""
+        config_data = {
+            "prompt": "Valid prompt",
+            "model": "sonnet"
+        }
+
+        result = validate_config_yaml(config_data)
+        assert result == config_data
+
+    def test_valid_config_with_short_haiku(self) -> None:
+        """短縮形エイリアス（haiku）を持つ有効な設定に対してバリデーションが成功することを確認"""
+        config_data = {
+            "prompt": "Valid prompt",
+            "model": "haiku"
+        }
+
+        result = validate_config_yaml(config_data)
+        assert result == config_data
+
+    def test_valid_config_with_short_opus(self) -> None:
+        """短縮形エイリアス（opus）を持つ有効な設定に対してバリデーションが成功することを確認"""
+        config_data = {
+            "prompt": "Valid prompt",
+            "model": "opus"
+        }
+
+        result = validate_config_yaml(config_data)
+        assert result == config_data
+
+    def test_valid_config_with_default(self) -> None:
+        """短縮形エイリアス（default）を持つ有効な設定に対してバリデーションが成功することを確認"""
+        config_data = {
+            "prompt": "Valid prompt",
+            "model": "default"
+        }
+
+        result = validate_config_yaml(config_data)
+        assert result == config_data
+
+    def test_invalid_model_name(self) -> None:
+        """サポートされていないモデル名に対してエラーを返すことを確認"""
+        config_data = {
+            "prompt": "Valid prompt",
+            "model": "invalid-model"
         }
 
         with pytest.raises(ValueError):
