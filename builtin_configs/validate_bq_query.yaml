@@ -50,4 +50,4 @@ prompt: |
 
   ### その他
   - **判断不能**: 上記に該当しない場合は`deny`
-model: claude-sonnet-4-5
+model: haiku
