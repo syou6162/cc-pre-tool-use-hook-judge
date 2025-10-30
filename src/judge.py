@@ -4,13 +4,32 @@ import json
 from typing import Any
 
 import anyio
-from claude_agent_sdk import AssistantMessage, TextBlock, query
+from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, query
 
 from src.schema import (
     PRETOOLUSE_INPUT_SCHEMA,
     PRETOOLUSE_OUTPUT_SCHEMA,
     validate_pretooluse_input,
 )
+
+# System prompt with JSON schemas
+SYSTEM_PROMPT = f"""You are a PreToolUse hook validator for Claude Code.
+
+Your task is to validate tool usage and return a decision.
+
+# Input JSON Schema
+{json.dumps(PRETOOLUSE_INPUT_SCHEMA, indent=2)}
+
+# Output JSON Schema
+{json.dumps(PRETOOLUSE_OUTPUT_SCHEMA, indent=2)}
+
+For now, always return a decision to ALLOW the operation with a simple reason.
+
+Return ONLY a valid JSON matching the output schema, with:
+- permissionDecision: "allow"
+- permissionDecisionReason: A brief explanation
+
+Output JSON only, no other text."""
 
 
 async def judge_pretooluse_async(input_json: str) -> dict[str, Any]:
@@ -32,32 +51,20 @@ async def judge_pretooluse_async(input_json: str) -> dict[str, Any]:
     tool_name = input_data["tool_name"]
     tool_input = input_data["tool_input"]
 
-    # Create prompt with JSON schemas
-    prompt = f"""You are a PreToolUse hook validator for Claude Code.
-
-Your task is to validate tool usage and return a decision.
-
-# Input JSON Schema
-{json.dumps(PRETOOLUSE_INPUT_SCHEMA, indent=2)}
-
-# Output JSON Schema
-{json.dumps(PRETOOLUSE_OUTPUT_SCHEMA, indent=2)}
-
-# Current Tool Usage
+    # Create user prompt with current tool usage
+    prompt = f"""# Current Tool Usage
 Tool: {tool_name}
-Input: {json.dumps(tool_input, indent=2)}
+Input: {json.dumps(tool_input, indent=2)}"""
 
-For now, always return a decision to ALLOW the operation with a simple reason.
-
-Return ONLY a valid JSON matching the output schema, with:
-- permissionDecision: "allow"
-- permissionDecisionReason: A brief explanation
-
-Output JSON only, no other text."""
+    # Configure Claude Agent options
+    options = ClaudeAgentOptions(
+        system_prompt=SYSTEM_PROMPT,
+        max_turns=1,  # Single-turn judgment
+    )
 
     # Call Claude Agent SDK for judgment
     response_text = ""
-    async for message in query(prompt=prompt):
+    async for message in query(prompt=prompt, options=options):
         if isinstance(message, AssistantMessage):
             for block in message.content:
                 if isinstance(block, TextBlock):
