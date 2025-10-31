@@ -108,10 +108,14 @@ hook-validator = "__main__:main"  # CLIコマンド名
 - `HOOK_EVENT_NAME`, `PERMISSION_*`, `DEFAULT_*`
 - リトライ回数やタイムアウト値
 
-### `exceptions.py` - カスタム例外
-- `JudgeError`: 基底例外クラス
-- `InvalidJSONError`, `NoResponseError`, `SchemaValidationError`
-- `ConfigError`: 設定読み込みエラー
+### `exceptions.py` - 判定関連の例外
+- `JudgeError`: 判定エラーの基底例外クラス
+- `InvalidJSONError`: JSON解析失敗
+- `NoResponseError`: LLMからの応答なし
+- `SchemaValidationError`: スキーマ検証失敗
+
+### `config.py` - 設定関連の例外
+- `ConfigError`: 設定ファイルの読み込み・検証失敗（`config.py`内で定義）
 
 ### `builtin_configs/` - 組み込み設定
 - BigQuery検証の設定（validate_bq_query.yaml）
