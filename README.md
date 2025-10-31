@@ -26,6 +26,8 @@ Claude CodeのPreToolUseフック用のバリデーター・判定システム�
 
 GitHubリポジトリから直接実行する最もシンプルな方法です：
 
+#### BigQueryバリデータ
+
 ```json
 # .claude/hooks.json
 {
@@ -40,16 +42,16 @@ GitHubリポジトリから直接実行する最もシンプルな方法です�
 
 この設定では、全てのツール実行前にBigQueryバリデータが動作します。
 
-#### 動作例
+**動作例:**
 
-**安全なクエリ（ALLOW）:**
+安全なクエリ（ALLOW）:
 ```bash
 bq query "SELECT * FROM dataset.table LIMIT 100"
 # → permissionDecision: "allow"
 # → 理由: 純粋なSELECT、読み取り専用操作
 ```
 
-**危険なクエリ（DENY）:**
+危険なクエリ（DENY）:
 ```bash
 bq query "DROP TABLE dataset.old_table"
 # → permissionDecision: "deny"
@@ -58,6 +60,55 @@ bq query "DROP TABLE dataset.old_table"
 bq query "INSERT INTO dataset.table VALUES (1, 'test')"
 # → permissionDecision: "deny"
 # → 理由: DML操作でデータを変更
+```
+
+#### Codex MCPバリデータ
+
+```json
+# .claude/hooks.json
+{
+  "hooks": [
+    {
+      "eventName": "PreToolUse",
+      "command": "uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_codex_mcp"
+    }
+  ]
+}
+```
+
+この設定では、MCP経由でCodexツールを実行する際の安全性をチェックします。
+
+**動作例:**
+
+安全な設定（ALLOW）:
+```python
+# sandbox=read-only（または未指定）、cwdが未指定
+mcp__codex__codex(prompt="テストを実行して")
+# → permissionDecision: "allow"
+# → 理由: 読み取り専用モードで安全
+
+# approval-policy=untrusted
+mcp__codex__codex(prompt="ファイルを作成して", sandbox="read-only", approval_policy="untrusted")
+# → permissionDecision: "allow"
+# → 理由: 承認ポリシーが適切
+```
+
+危険な設定（DENY）:
+```python
+# sandbox=danger-full-access
+mcp__codex__codex(prompt="ファイルを削除して", sandbox="danger-full-access")
+# → permissionDecision: "deny"
+# → 理由: システム全体への書き込みが可能
+
+# approval-policy=never
+mcp__codex__codex(prompt="スクリプトを実行して", approval_policy="never")
+# → permissionDecision: "deny"
+# → 理由: 承認なしでコマンド実行
+
+# cwd=別のディレクトリ
+mcp__codex__codex(prompt="設定を変更して", cwd="/etc")
+# → permissionDecision: "deny"
+# → 理由: 意図しないディレクトリでの操作
 ```
 
 ### cchookと組み合わせて使う（推奨）
@@ -80,6 +131,20 @@ preToolUse:
 ```
 
 この設定により、`bq query`コマンドのみがバリデーションの対象になります。
+
+#### ビルトインCodex MCPバリデータ
+
+```yaml
+# .cchook/config.yaml
+preToolUse:
+  - matcher: "mcp__codex__codex"
+    actions:
+      - type: command
+        exit_status: 0 # JSON Outputで制御するので、exit_statusはこれでよい
+        command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_codex_mcp
+```
+
+この設定により、MCP Codexツールの実行時のみがバリデーションの対象になります。
 
 #### カスタム設定ファイルの使用
 
@@ -211,7 +276,8 @@ uv run pre-commit run --all-files
 ```
 cc-pre-tool-use-hook-judge/
 ├── builtin_configs/
-│   └── validate_bq_query.yaml   # ビルトインBigQueryバリデータ設定
+│   ├── validate_bq_query.yaml   # ビルトインBigQueryバリデータ設定
+│   └── validate_codex_mcp.yaml  # ビルトインCodex MCPバリデータ設定
 ├── src/
 │   ├── __init__.py
 │   ├── __main__.py              # エントリーポイント（stdin/stdout、argparse）
