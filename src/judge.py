@@ -111,13 +111,12 @@ def _create_retry_error_message(e: Exception) -> str:
         Formatted error message for retry
     """
     if isinstance(e, InvalidResponseFormatError):
-        return f"{str(e)}\n\nPlease try again."
+        return str(e)
     elif isinstance(e, json.JSONDecodeError):
         return (
             f"Your response could not be parsed as JSON.\n"
             f"Error: {str(e)}\n\n"
-            f"Please return ONLY a raw JSON object starting with {{ and ending with }}.\n"
-            f"Please try again."
+            f"Please return ONLY a raw JSON object starting with {{ and ending with }}."
         )
     elif isinstance(e, ValueError):
         return (
@@ -246,10 +245,12 @@ Output JSON only, no other text, no code blocks, no formatting."""
                     raise SchemaValidationError(
                         f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                     )
-                else:
+                elif isinstance(e, json.JSONDecodeError):
                     raise InvalidJSONError(
-                        f"Failed to get valid response after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
+                        f"Failed to parse JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                     )
+                else:
+                    raise
 
     # This line is unreachable but required for mypy type checking
     raise AssertionError("Unreachable code")
