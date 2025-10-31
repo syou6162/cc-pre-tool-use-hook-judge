@@ -169,12 +169,8 @@ async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str, model:
     Raises:
         ValueError: If JSON parsing fails after retries
     """
-    tool_name = input_data["tool_name"]
-    tool_input = input_data["tool_input"]
-
     user_prompt = f"""# Current Tool Usage
-Tool: {tool_name}
-Input: {json.dumps(tool_input, indent=2)}"""
+{json.dumps(input_data, indent=2)}"""
 
     system_prompt = SystemPromptPreset(
         type="preset",
