@@ -86,9 +86,3 @@ class SchemaValidationError(JudgeError):
     """Schema validation failed."""
 
     pass
-
-
-class ConfigError(JudgeError):
-    """Configuration file loading or validation failed."""
-
-    pass
