@@ -20,42 +20,25 @@ Claude CodeのPreToolUseフック用のバリデーター・判定システム�
 - **セキュリティ優先**: デフォルトで拒否、明示的な許可のみ通す設計
 - **リトライロジック**: JSON解析やスキーマ検証失敗時の自動リトライ（最大3回）
 
-## インストール
-
-### 前提条件
-
-- Python 3.11以上
-- [uv](https://docs.astral.sh/uv/) パッケージマネージャー
-
-### セットアップ
-
-```bash
-# リポジトリのクローン
-git clone https://github.com/yourusername/cc-pre-tool-use-hook-judge.git
-cd cc-pre-tool-use-hook-judge
-
-# 依存関係のインストール
-uv sync
-
-# 開発用依存関係も含めてインストール
-uv sync --all-groups
-```
-
 ## 使い方
 
-### ビルトインBigQueryバリデータ
+### Claude Codeのデフォルトフックとして使う
 
-`--builtin`オプションでビルトイン設定を指定できます：
+GitHubリポジトリから直接実行する最もシンプルな方法です：
 
-```yaml
-# .cchook/config.yaml
-preToolUse:
-  - matcher:
-      toolName: Bash
-      toolInput:
-        command: "^bq query"
-    command: uv run cc-pre-tool-use-hook-judge --builtin validate_bq_query
+```json
+# .claude/hooks.json
+{
+  "hooks": [
+    {
+      "eventName": "PreToolUse",
+      "command": "uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_bq_query"
+    }
+  ]
+}
 ```
+
+この設定では、全てのツール実行前にBigQueryバリデータが動作します。
 
 #### 動作例
 
@@ -77,7 +60,25 @@ bq query "INSERT INTO dataset.table VALUES (1, 'test')"
 # → 理由: DML操作でデータを変更
 ```
 
-### カスタム設定ファイルの使用
+### cchookと組み合わせて使う（推奨）
+
+[cchook](https://github.com/syou6162/cchook)を使うと、特定のコマンドのみをバリデートできます：
+
+#### ビルトインBigQueryバリデータ
+
+```yaml
+# .cchook/config.yaml
+preToolUse:
+  - matcher:
+      toolName: Bash
+      toolInput:
+        command: "^bq query"
+    command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_bq_query
+```
+
+この設定により、`bq query`コマンドのみがバリデーションの対象になります。
+
+#### カスタム設定ファイルの使用
 
 外部YAML設定ファイルでカスタムプロンプトを指定できます：
 
@@ -97,22 +98,7 @@ allowed_tools:
 preToolUse:
   - matcher:
       toolName: Bash
-    command: uv run cc-pre-tool-use-hook-judge --config custom_validator.yaml
-```
-
-### Claude Codeフックとして使用（レガシー）
-
-Claude Codeの設定ファイル（`.claude/hooks.json`）に以下を追加：
-
-```json
-{
-  "hooks": [
-    {
-      "eventName": "PreToolUse",
-      "command": "uv run cc-pre-tool-use-hook-judge"
-    }
-  ]
-}
+    command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --config custom_validator.yaml
 ```
 
 ### 標準入出力での動作
@@ -147,7 +133,28 @@ echo '{"session_id":"test","hook_event_name":"PreToolUse","tool_name":"Write",..
 }
 ```
 
-## 開発
+## 開発者向け情報
+
+### インストール（ローカル開発用）
+
+#### 前提条件
+
+- Python 3.11以上
+- [uv](https://docs.astral.sh/uv/) パッケージマネージャー
+
+#### セットアップ
+
+```bash
+# リポジトリのクローン
+git clone https://github.com/yourusername/cc-pre-tool-use-hook-judge.git
+cd cc-pre-tool-use-hook-judge
+
+# 依存関係のインストール
+uv sync
+
+# 開発用依存関係も含めてインストール
+uv sync --all-groups
+```
 
 ### テストの実行
 
@@ -191,7 +198,7 @@ uv run pre-commit install
 uv run pre-commit run --all-files
 ```
 
-## プロジェクト構造
+### プロジェクト構造
 
 ```
 cc-pre-tool-use-hook-judge/
@@ -215,7 +222,7 @@ cc-pre-tool-use-hook-judge/
 └── README.md
 ```
 
-## 技術スタック
+### 技術スタック
 
 - **Python 3.11+**: 最新の型ヒント機能を活用
 - **Claude Agent SDK**: 双方向会話による高度な判断

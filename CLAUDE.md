@@ -16,6 +16,42 @@ Claude CodeのPreToolUseフック用のバリデーター・判定システム�
 4. **DRY原則**: partial関数やカスタム例外で重複を排除
 5. **テスト可能性**: 純粋関数とSDK依存部分を分離
 
+## 使用例
+
+### Claude Codeのデフォルトフックとして使う
+
+GitHubリポジトリから直接実行する最もシンプルな方法です：
+
+```json
+# .claude/hooks.json
+{
+  "hooks": [
+    {
+      "eventName": "PreToolUse",
+      "command": "uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_bq_query"
+    }
+  ]
+}
+```
+
+この設定では、全てのツール実行前にBigQueryバリデータが動作します。
+
+### cchookと組み合わせて使う（推奨）
+
+[cchook](https://github.com/syou6162/cchook)と組み合わせることで、特定のコマンドのみをバリデートできます：
+
+```yaml
+# .cchook/config.yaml
+preToolUse:
+  - matcher:
+      toolName: Bash
+      toolInput:
+        command: "^bq query"
+    command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_bq_query
+```
+
+この設定により、`bq query`コマンドのみがバリデーションの対象になります。
+
 ## アーキテクチャ
 
 ### データフロー
