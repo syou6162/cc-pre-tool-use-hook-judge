@@ -39,17 +39,20 @@ stdout (JSON)
 ### 主要コンポーネント
 
 #### 1. `src/__main__.py`
-- **役割**: エントリーポイント、stdin/stdout処理、例外ハンドリング
+- **役割**: エントリーポイント、CLI引数解析、stdin/stdout処理、例外ハンドリング
 - **責務**:
+  - コマンドライン引数の解析（`--config`、`--builtin`）
+  - 設定ファイルの読み込み
   - 標準入力からJSON読み取り
   - JSON parsingと入力検証の呼び出し
-  - 判定ロジックの実行
+  - カスタムプロンプトを指定して判定ロジックを実行
   - エラー時の適切なJSON出力（deny決定）
   - 標準出力へのJSON書き込み
 - **注意点**:
   - 全ての出力は**stdout**に出力する（Claude Code hook仕様）
   - stderrは使わない
   - `sys.exit(1)`は使わない（exit code 0で正常終了）
+  - `--config`と`--builtin`は相互排他（両方指定不可）
 
 #### 2. `src/schema.py`
 - **役割**: JSON Schema定義と検証ロジック
@@ -66,17 +69,21 @@ stdout (JSON)
 #### 3. `src/judge.py`
 - **役割**: Claude Agent SDKを使った判定ロジック
 - **責務**:
+  - カスタムプロンプトの処理（SystemPromptPreset切り替え）
   - Claude Agent SDKとの双方向会話
   - リトライロジック（最大3回）
   - JSON解析エラー・スキーマ検証エラーのハンドリング
   - 出力データのラッピング（hookSpecificOutput形式）
 - **主要関数**:
-  - `judge_pretooluse()`: 同期版エントリーポイント（anyio.run()のラッパー）
-  - `judge_pretooluse_async()`: 非同期版メインロジック（リトライループ）
+  - `judge_pretooluse(input_data, prompt=None)`: 同期版エントリーポイント（anyio.run()のラッパー）
+  - `judge_pretooluse_async(input_data, prompt=None)`: 非同期版メインロジック（リトライループ）
   - `_receive_text_response()`: Claude Agent SDKからのテキスト受信
   - `_wrap_output_if_needed()`: 出力データのラッピング
+- **SystemPromptPreset**:
+  - `prompt=None`: 既存のSYSTEM_PROMPT文字列を使用
+  - `prompt="..."`: `{"type": "preset", "preset": "claude_code", "append": prompt}`を使用
 - **注意点**:
-  - テストが難しい（SDK依存が強い）
+  - テストが難しい（SDK依存が強い、モックが複雑）
   - リトライ時はSDKの会話機能を使ってエラー内容を伝える
 
 #### 4. `src/exceptions.py`
@@ -88,7 +95,40 @@ stdout (JSON)
   - `SchemaValidationError`: スキーマ検証失敗
 - **メリット**: 文字列パターンマッチングではなく型ベースのエラー分類が可能
 
-#### 5. `src/constants.py`
+#### 4. `src/config.py`
+- **役割**: YAML設定ファイルの読み込みと検証
+- **責務**:
+  - ビルトイン設定の読み込み（`builtin_configs/`ディレクトリから）
+  - 外部設定ファイルの読み込み（`--config`オプションで指定）
+  - YAML構文エラーのハンドリング
+  - スキーマ検証（`schema.py`を使用）
+- **主要関数**:
+  - `load_builtin_config(name: str) -> ConfigDict`: ビルトイン設定読み込み
+  - `load_config(path: Path) -> ConfigDict`: 外部設定読み込み
+- **例外**:
+  - `ConfigError`: 設定ファイル読み込み・検証失敗時
+- **注意点**:
+  - `importlib.resources`を使ってパッケージ内のビルトイン設定にアクセス
+
+#### 5. `src/models.py`
+- **役割**: TypedDict型定義
+- **型定義**:
+  - `ConfigDict`: YAML設定構造
+    - `prompt`: str（必須）
+    - `model`: NotRequired[str]（オプション）
+    - `allowed_tools`: NotRequired[list[str]]（オプション）
+
+#### 6. `src/exceptions.py`
+- **役割**: カスタム例外クラスの定義
+- **設計**:
+  - `JudgeError`: 基底例外クラス
+  - `InvalidJSONError`: JSON parsing失敗
+  - `NoResponseError`: SDKから応答なし
+  - `SchemaValidationError`: スキーマ検証失敗
+  - `ConfigError`: 設定ファイル読み込み失敗
+- **メリット**: 文字列パターンマッチングではなく型ベースのエラー分類が可能
+
+#### 7. `src/constants.py`
 - **役割**: アプリケーション全体で使用する定数の一元管理
 - **定数**:
   - `HOOK_EVENT_NAME`: "PreToolUse"
@@ -96,6 +136,14 @@ stdout (JSON)
   - `DEFAULT_PERMISSION_DECISION`: "deny"（セキュリティ優先）
   - `DEFAULT_PERMISSION_REASON`: デフォルトエラーメッセージ
   - `MAX_RETRY_ATTEMPTS`: 3
+
+#### 8. `builtin_configs/validate_bq_query.yaml`
+- **役割**: BigQueryクエリバリデータのビルトイン設定
+- **内容**:
+  - BigQueryクエリの安全性判定ルール
+  - 安全な操作（SELECT、INFORMATION_SCHEMA、WITH）
+  - 危険な操作（DDL、DML、DCL、BigQuery ML、危険なオプション）
+- **使用方法**: `--builtin validate_bq_query`で指定
 
 ## コーディング規約
 
@@ -123,31 +171,76 @@ stdout (JSON)
 - **SDK依存部分はテスト不要**: `judge.py`の大部分（モックが複雑すぎる）
 - **簡単な辞書操作のみの関数はテスト不要**: `_wrap_output_if_needed`など
 
+## YAML設定形式
+
+### 設定ファイル構造
+
+```yaml
+prompt: |
+  あなたのカスタムプロンプトをここに書く。
+  複数行可能。
+model: claude-sonnet-4-5  # オプション
+allowed_tools:            # オプション
+  - Bash
+  - Read
+  - Write
+```
+
+### フィールド説明
+
+- **prompt** (必須): カスタムプロンプト文字列
+  - Claude Agent SDKに渡される追加プロンプト
+  - SystemPromptPresetの`append`フィールドに設定される
+- **model** (オプション): 使用するClaudeモデル
+  - 指定可能な値: `claude-sonnet-4-5`, `claude-opus-4-1`, `sonnet`, `opus`, `haiku`, など
+- **allowed_tools** (オプション): 許可するツールのリスト
+  - 現在未使用（将来の拡張用）
+
+### カスタム設定の作成例
+
+```yaml
+# custom_validator.yaml
+prompt: |
+  あなたはセキュリティ専門家です。
+  危険な操作を見抜いて拒否してください。
+model: sonnet
+```
+
+使用方法:
+```bash
+uv run cc-pre-tool-use-hook-judge --config custom_validator.yaml
+```
+
 ## ファイル構造詳細
 
 ```
 cc-pre-tool-use-hook-judge/
+├── builtin_configs/
+│   └── validate_bq_query.yaml   # BigQueryバリデータ設定
 ├── src/
-│   ├── __init__.py           # 空
-│   ├── __main__.py           # main()関数、CLIエントリーポイント
-│   ├── constants.py          # 定数定義
-│   ├── exceptions.py         # カスタム例外クラス
-│   ├── judge.py              # Claude Agent SDK判定ロジック
-│   └── schema.py             # JSON Schema定義と検証
+│   ├── __init__.py              # 空
+│   ├── __main__.py              # main()関数、CLIエントリーポイント
+│   ├── config.py                # YAML設定ローダー
+│   ├── constants.py             # 定数定義
+│   ├── exceptions.py            # カスタム例外クラス
+│   ├── judge.py                 # Claude Agent SDK判定ロジック
+│   ├── models.py                # TypedDict型定義
+│   └── schema.py                # JSON Schema定義と検証
 ├── tests/
-│   ├── __init__.py           # 空
-│   ├── fixtures/             # テストフィクスチャ（現在は未使用）
-│   └── test_schema.py        # schema.pyの単体テスト
+│   ├── __init__.py              # 空
+│   ├── test_config.py           # config.pyの単体テスト
+│   ├── test_models.py           # models.pyの型テスト
+│   └── test_schema.py           # schema.pyの単体テスト
 ├── .github/
 │   └── workflows/
-│       └── ci.yml            # GitHub Actions CI設定
-├── .pre-commit-config.yaml   # pre-commit hooks設定
-├── pyproject.toml            # プロジェクト設定、依存関係
-├── uv.lock                   # uvロックファイル
-├── renovate.json             # Renovate Bot設定
-├── LICENSE                   # MITライセンス
-├── README.md                 # ユーザー向けドキュメント
-└── CLAUDE.md                 # このファイル（開発ガイド）
+│       └── ci.yml               # GitHub Actions CI設定
+├── .pre-commit-config.yaml      # pre-commit hooks設定
+├── pyproject.toml               # プロジェクト設定、依存関係
+├── uv.lock                      # uvロックファイル
+├── renovate.json                # Renovate Bot設定
+├── LICENSE                      # MITライセンス
+├── README.md                    # ユーザー向けドキュメント
+└── CLAUDE.md                    # このファイル（開発ガイド）
 ```
 
 ## 開発ワークフロー
@@ -242,10 +335,25 @@ uv run ruff format src tests
 
 ## トラブルシューティング
 
+### 設定ファイルエラー
+
+**症状**: `ConfigError: Builtin config '...' not found`
+- **原因**: 指定したビルトイン設定名が存在しない
+- **解決**: `builtin_configs/`ディレクトリ内のYAMLファイル名を確認
+
+**症状**: `ConfigError: Validation failed for config file`
+- **原因**: YAML設定がスキーマに従っていない
+- **解決**: 必須フィールド（`prompt`）があるか確認、モデル名が正しいか確認
+
+**症状**: `ConfigError: Failed to parse config file`
+- **原因**: YAML構文エラー
+- **解決**: YAMLのインデントや引用符を確認
+
 ### Claude Codeフックが動かない
 - 出力が**stdout**に出ているか確認（stderrではない）
 - JSON形式が正しいか確認
 - exit codeが0か確認（`sys.exit(1)`は使わない）
+- `--config`と`--builtin`を同時指定していないか確認
 
 ### テストが失敗する
 - `uv sync --all-groups`で依存関係を再インストール
