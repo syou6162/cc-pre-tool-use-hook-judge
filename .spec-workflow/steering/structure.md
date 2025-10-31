@@ -6,23 +6,23 @@
 cc-pre-tool-use-hook-judge/
 ├── src/                         # フラットパッケージ構造
 │   ├── __init__.py              # パッケージ初期化
-│   ├── __main__.py              # CLIエントリーポイント（python -m で実行）
-│   ├── cli.py                   # コマンドライン引数パース（argparse）
+│   ├── __main__.py              # CLIエントリーポイント（argparse統合）
 │   ├── config.py                # YAML設定の読み込みとバリデーション
-│   ├── judge.py                 # メイン判定ロジック（オーケストレーター）
-│   ├── schema.py                # JSON schema定義
-│   ├── models.py                # データモデル（型定義）
-│   └── builtin_configs/         # 組み込みYAML設定（パッケージデータ）
-│       ├── git-protection.yaml
-│       └── bigquery-protection.yaml
+│   ├── constants.py             # 定数定義
+│   ├── exceptions.py            # カスタム例外クラス
+│   ├── judge.py                 # メイン判定ロジック（Claude Agent SDK統合）
+│   ├── schema.py                # JSON schema定義とバリデーション
+│   └── models.py                # データモデル（TypedDict型定義）
+├── builtin_configs/             # 組み込みYAML設定（パッケージデータ）
+│   └── validate_bq_query.yaml   # BigQuery検証設定
 ├── tests/                       # テストコード
 │   ├── __init__.py
-│   ├── test_cli.py              # CLI引数パースのテスト
 │   ├── test_config.py           # 設定読み込みのテスト
 │   ├── test_judge.py            # 判定ロジックのテスト
+│   ├── test_models.py           # データモデルのテスト
+│   ├── test_schema.py           # スキーマ検証のテスト
 │   └── fixtures/                # テスト用フィクスチャ
-│       ├── configs/             # テスト用YAML設定
-│       └── inputs/              # テスト用入力データ
+│       └── configs/             # テスト用YAML設定
 ├── .spec-workflow/              # 仕様管理（spec workflow）
 │   ├── steering/
 │   ├── specs/
@@ -76,10 +76,11 @@ hook-validator = "__main__:main"  # CLIコマンド名
 
 ## Module Responsibilities
 
-### `cli.py` - コマンドライン引数パース
-- `argparse`を使った引数パース
-- `--config`, `--verbose`, `--tool`, `--input`等のオプション処理
-- 引数バリデーション
+### `__main__.py` - CLIエントリーポイント
+- `argparse`を使った引数パース（`--config`, `--builtin`オプション）
+- stdin/stdoutでのJSON入出力処理
+- エラーハンドリングと結果出力
+- 全体の処理フロー統括
 
 ### `config.py` - 設定管理
 - YAML設定ファイルの読み込み
@@ -87,35 +88,45 @@ hook-validator = "__main__:main"  # CLIコマンド名
 - jsonschemaによる設定バリデーション
 - デフォルト値の適用
 
-### `judge.py` - 判定オーケストレーター
-- **メインロジック統合**:
-  1. 設定からマッチングルールを検索
-  2. Claude Agent SDKでLLM判定を実行
-  3. 結果をJSON形式で整形
-- LLM判定は直接このモジュール内で実装（別ファイル分割不要）
+### `judge.py` - 判定ロジック
+- Claude Agent SDKを使ったLLM判定の実行
+- カスタムプロンプトの適用（SystemPromptPreset）
+- リトライロジックとエラーハンドリング
+- 出力のラッピングと検証
 
-### `schema.py` - スキーマ定義
-- PreToolUse出力のJSON schema定義
+### `schema.py` - スキーマ定義とバリデーション
+- PreToolUse入出力のJSON schema定義
 - YAML設定ファイルのJSON schema定義
-- バリデーション関数
+- jsonschemaを使った検証関数
+- スキーマ検証エラーの処理
 
 ### `models.py` - データモデル
-- 型定義（dataclass or TypedDict）
-- `ValidationResult`
-- `ConfigModel`
-- `MatchRule`
+- TypedDictを使った型定義
+- `ConfigDict`: YAML設定の型定義（prompt, model, allowed_tools）
+
+### `constants.py` - 定数定義
+- `HOOK_EVENT_NAME`, `PERMISSION_*`, `DEFAULT_*`
+- リトライ回数やタイムアウト値
+
+### `exceptions.py` - 判定関連の例外
+- `JudgeError`: 判定エラーの基底例外クラス
+- `InvalidJSONError`: JSON解析失敗
+- `NoResponseError`: LLMからの応答なし
+- `SchemaValidationError`: スキーマ検証失敗
+
+### `config.py` - 設定関連の例外
+- `ConfigError`: 設定ファイルの読み込み・検証失敗（`config.py`内で定義）
 
 ### `builtin_configs/` - 組み込み設定
-- Git保護の設定（git-protection.yaml）
-- BigQuery保護の設定（bigquery-protection.yaml）
-- パッケージデータとして同梱、インストール時にコピー
+- BigQuery検証の設定（validate_bq_query.yaml）
+- パッケージデータとして同梱（pyproject.tomlでforce-include）
 
 ## Naming Conventions
 
 ### Files
 - **Modules**: `snake_case.py` (例: `config.py`, `judge.py`)
 - **Tests**: `test_[module_name].py` (例: `test_judge.py`)
-- **Builtin Configs**: `kebab-case.yaml` (例: `git-protection.yaml`)
+- **Builtin Configs**: `snake_case.yaml` (例: `validate_bq_query.yaml`)
 
 ### Code
 - **Classes/Types**: `PascalCase` (例: `ConfigModel`, `ValidationResult`)
@@ -242,20 +253,27 @@ def judge_command(tool_name: str, command: str, config: ConfigModel) -> Validati
 ## Code Organization Principles
 
 1. **Single Responsibility**: 各モジュールは1つの責務のみ
-   - `config.py` → 設定読み込みのみ
-   - `judge.py` → 判定ロジックのみ（LLM呼び出し含む）
-   - `cli.py` → CLI引数パースのみ
+   - `__main__.py` → CLIエントリーポイントと処理フロー統括
+   - `config.py` → YAML設定読み込みとバリデーション
+   - `judge.py` → LLM判定ロジックのみ
+   - `schema.py` → JSON schema定義とバリデーション
+   - `models.py` → 型定義のみ
+   - `constants.py` → 定数定義のみ
+   - `exceptions.py` → カスタム例外定義のみ
 
 2. **Dependency Direction**: 依存関係は一方向
    ```
-   cli.py (CLI層)
+   __main__.py (CLI層)
      ↓
    judge.py (判定ロジック層 - LLM呼び出し含む)
      ↓
    Claude Agent SDK (外部依存)
 
-   config.py (設定層) ← 全ての層から参照可能
+   config.py (設定層) ← __main__.pyから参照
+   schema.py (検証層) ← __main__.py, judge.pyから参照
    models.py (モデル層) ← 全ての層から参照可能
+   constants.py (定数層) ← 全ての層から参照可能
+   exceptions.py (例外層) ← 全ての層から参照可能
    ```
 
 3. **Testability**: 全ての関数は単体でテスト可能
@@ -288,16 +306,20 @@ def judge_command(tool_name: str, command: str, config: ConfigModel) -> Validati
 
 ### Dependencies Direction
 ```
-cli.py (CLI層)
-  ↓
+__main__.py (CLI層)
+  ├→ config.py で設定読み込み
+  ├→ schema.py で入出力検証
+  └→ judge.py でLLM判定
+
 judge.py (判定ロジック層)
   ├→ Claude Agent SDK でLLM判定
-  └→ config.py で設定取得
+  └→ schema.py で出力検証
 
 config.py (設定層)
-  └→ builtin_configs/ (組み込み設定)
+  ├→ builtin_configs/ (組み込み設定)
+  └→ schema.py で設定検証
 
-models.py (モデル層) ← 全ての層から参照可能
+models.py, constants.py, exceptions.py ← 全ての層から参照可能
 ```
 
 ## Code Size Guidelines
@@ -384,7 +406,7 @@ class TestJudge:
 packages = ["src"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/builtin_configs" = "builtin_configs"
+"builtin_configs" = "builtin_configs"
 ```
 
 ### 実行時の読み込み
@@ -393,13 +415,13 @@ packages = ["src"]
 from pathlib import Path
 import importlib.resources
 
-# builtin_configs/git-protection.yaml を読み込む
-with importlib.resources.files('builtin_configs').joinpath('git-protection.yaml').open() as f:
+# builtin_configs/validate_bq_query.yaml を読み込む
+with importlib.resources.files('builtin_configs').joinpath('validate_bq_query.yaml').open() as f:
     config_data = f.read()
 ```
 
 ### ユーザー設定 vs 組み込み設定
 
 - **ユーザー設定**: `--config path/to/config.yaml`で指定
-- **組み込み設定**: デフォルトで読み込まれる（Git、BigQuery）
-- **マージ**: ユーザー設定が優先、組み込み設定は補完的に使用
+- **組み込み設定**: `--builtin validate_bq_query`で指定（デフォルトでは読み込まれない）
+- **デフォルト動作**: 設定未指定時はdeny-by-default設計で拒否

@@ -43,7 +43,64 @@ uv sync --all-groups
 
 ## 使い方
 
-### Claude Codeフックとして使用
+### ビルトインBigQueryバリデータ
+
+`--builtin`オプションでビルトイン設定を指定できます：
+
+```yaml
+# .cchook/config.yaml
+preToolUse:
+  - matcher:
+      toolName: Bash
+      toolInput:
+        command: "^bq query"
+    command: uv run cc-pre-tool-use-hook-judge --builtin validate_bq_query
+```
+
+#### 動作例
+
+**安全なクエリ（ALLOW）:**
+```bash
+bq query "SELECT * FROM dataset.table LIMIT 100"
+# → permissionDecision: "allow"
+# → 理由: 純粋なSELECT、読み取り専用操作
+```
+
+**危険なクエリ（DENY）:**
+```bash
+bq query "DROP TABLE dataset.old_table"
+# → permissionDecision: "deny"
+# → 理由: DDL操作でデータを削除
+
+bq query "INSERT INTO dataset.table VALUES (1, 'test')"
+# → permissionDecision: "deny"
+# → 理由: DML操作でデータを変更
+```
+
+### カスタム設定ファイルの使用
+
+外部YAML設定ファイルでカスタムプロンプトを指定できます：
+
+```yaml
+# custom_validator.yaml
+prompt: |
+  あなたはカスタムバリデーターです。
+  独自のルールでツール使用を判定してください。
+model: claude-sonnet-4-5
+allowed_tools:
+  - Bash
+  - Read
+```
+
+```yaml
+# .cchook/config.yaml
+preToolUse:
+  - matcher:
+      toolName: Bash
+    command: uv run cc-pre-tool-use-hook-judge --config custom_validator.yaml
+```
+
+### Claude Codeフックとして使用（レガシー）
 
 Claude Codeの設定ファイル（`.claude/hooks.json`）に以下を追加：
 
@@ -138,17 +195,23 @@ uv run pre-commit run --all-files
 
 ```
 cc-pre-tool-use-hook-judge/
+├── builtin_configs/
+│   └── validate_bq_query.yaml   # ビルトインBigQueryバリデータ設定
 ├── src/
 │   ├── __init__.py
-│   ├── __main__.py          # エントリーポイント（stdin/stdout処理）
-│   ├── constants.py         # 定数定義
-│   ├── exceptions.py        # カスタム例外クラス
-│   ├── judge.py             # 判定ロジック（Claude Agent SDK）
-│   └── schema.py            # JSON Schema定義と検証関数
+│   ├── __main__.py              # エントリーポイント（stdin/stdout、argparse）
+│   ├── config.py                # YAML設定ローダー
+│   ├── constants.py             # 定数定義
+│   ├── exceptions.py            # カスタム例外クラス
+│   ├── judge.py                 # 判定ロジック（Claude Agent SDK）
+│   ├── models.py                # TypedDict型定義
+│   └── schema.py                # JSON Schema定義と検証関数
 ├── tests/
 │   ├── __init__.py
-│   └── test_schema.py       # スキーマ検証のテスト
-├── pyproject.toml           # プロジェクト設定
+│   ├── test_config.py           # 設定ローダーのテスト
+│   ├── test_models.py           # 型定義のテスト
+│   └── test_schema.py           # スキーマ検証のテスト
+├── pyproject.toml               # プロジェクト設定
 └── README.md
 ```
 
@@ -156,6 +219,7 @@ cc-pre-tool-use-hook-judge/
 
 - **Python 3.11+**: 最新の型ヒント機能を活用
 - **Claude Agent SDK**: 双方向会話による高度な判断
+- **PyYAML**: YAML設定ファイルの読み込み
 - **jsonschema**: JSON Schemaベースの厳密な検証
 - **pytest**: テストフレームワーク
 - **mypy**: 静的型チェック（strict mode）

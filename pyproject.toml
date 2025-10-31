@@ -9,6 +9,7 @@ requires-python = ">=3.11"
 dependencies = [
     "claude-agent-sdk>=0.1.5",
     "jsonschema>=4.25.1",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
@@ -17,10 +18,14 @@ cc-pre-tool-use-hook-judge = "src.__main__:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"builtin_configs" = "builtin_configs"
+
 [dependency-groups]
 dev = [
     "mypy>=1.18.2",
     "pytest>=8.4.2",
     "ruff>=0.14.2",
     "types-jsonschema>=4.25.1.20251009",
+    "types-pyyaml>=6.0",
 ]
