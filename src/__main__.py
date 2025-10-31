@@ -72,13 +72,13 @@ def main() -> None:
         elif args.config:
             # Load external configuration
             config = load_config(args.config)
-            custom_prompt = config.get("prompt")
+            custom_prompt = config["prompt"]  # Required field
             custom_model = config.get("model")
             custom_allowed_tools = config.get("allowed_tools")
         elif args.builtin:
             # Load builtin configuration
             config = load_builtin_config(args.builtin)
-            custom_prompt = config.get("prompt")
+            custom_prompt = config["prompt"]  # Required field
             custom_model = config.get("model")
             custom_allowed_tools = config.get("allowed_tools")
         else:

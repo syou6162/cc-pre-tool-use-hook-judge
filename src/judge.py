@@ -152,13 +152,12 @@ def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:
     return output_data
 
 
-async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
+async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (async).
 
     Args:
         input_data: Validated PreToolUse hook input dictionary
-        prompt: Optional custom prompt to append to the default system prompt.
-                If None, uses SYSTEM_PROMPT as-is.
+        prompt: Custom prompt to append to the Claude Code system prompt.
         model: Optional model name to use for the judgment.
                If None, uses the default model.
         allowed_tools: Optional list of allowed tool names for Claude Agent SDK.
@@ -177,28 +176,11 @@ async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None 
 Tool: {tool_name}
 Input: {json.dumps(tool_input, indent=2)}"""
 
-    system_prompt: str | SystemPromptPreset
-    if prompt is None:
-        system_prompt = SYSTEM_PROMPT
-    else:
-        json_instructions = f"""
-
-# Output JSON Schema
-{json.dumps(PRETOOLUSE_OUTPUT_SCHEMA, indent=2)}
-
-IMPORTANT: Return ONLY raw JSON. Do NOT wrap it in markdown code blocks (```json or ```).
-
-Return ONLY a valid JSON matching the output schema, with:
-- permissionDecision: "allow", "deny", or "ask"
-- permissionDecisionReason: A brief explanation
-
-Output JSON only, no other text, no code blocks, no formatting."""
-
-        system_prompt = SystemPromptPreset(
-            type="preset",
-            preset="claude_code",
-            append=prompt + json_instructions
-        )
+    system_prompt = SystemPromptPreset(
+        type="preset",
+        preset="claude_code",
+        append=prompt
+    )
 
     # Note: Only pass allowed_tools if explicitly set (not None) to preserve SDK defaults
     options_dict: dict[str, Any] = {
@@ -253,13 +235,12 @@ Output JSON only, no other text, no code blocks, no formatting."""
     raise AssertionError("Unreachable: async with block should always return or raise")
 
 
-def judge_pretooluse(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
+def judge_pretooluse(input_data: dict[str, Any], prompt: str, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (sync wrapper).
 
     Args:
         input_data: Validated PreToolUse hook input dictionary
-        prompt: Optional custom prompt to append to the default system prompt.
-                If None, uses SYSTEM_PROMPT as-is.
+        prompt: Custom prompt to append to the Claude Code system prompt.
         model: Optional model name to use for the judgment.
                If None, uses the default model.
         allowed_tools: Optional list of allowed tool names for Claude Agent SDK.
