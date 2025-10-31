@@ -1,6 +1,7 @@
 """Main judgment logic for PreToolUse hook validation."""
 
 import json
+import re
 from typing import Any
 
 import anyio
@@ -18,7 +19,15 @@ from src.constants import (
     HOOK_EVENT_NAME,
     MAX_RETRY_ATTEMPTS,
 )
-from src.exceptions import InvalidJSONError, NoResponseError, SchemaValidationError
+from src.exceptions import (
+    CodeFenceInResponseError,
+    InvalidJSONError,
+    InvalidJSONPrefixError,
+    InvalidJSONSuffixError,
+    InvalidResponseFormatError,
+    NoResponseError,
+    SchemaValidationError,
+)
 from src.schema import (
     PRETOOLUSE_INPUT_SCHEMA,
     PRETOOLUSE_OUTPUT_SCHEMA,
@@ -63,6 +72,42 @@ async def _receive_text_response(client: ClaudeSDKClient) -> str:
                 if isinstance(block, TextBlock):
                     response_text += block.text
     return response_text
+
+
+def _validate_response_format(text: str) -> None:
+    """Validate response text format before JSON parsing.
+
+    Checks for common formatting issues and raises specific errors:
+    - Code fences (```json or ```)
+    - Leading emoji or special characters before {
+    - Text before or after JSON
+
+    Args:
+        text: Response text to validate
+
+    Raises:
+        CodeFenceInResponseError: If response contains markdown code fences
+        InvalidJSONPrefixError: If response has invalid prefix before JSON
+        InvalidJSONSuffixError: If response has text after JSON
+    """
+    text_stripped = text.strip()
+
+    # Check for code fences - most specific check first
+    if re.search(r'```', text_stripped):
+        raise CodeFenceInResponseError(CodeFenceInResponseError.create_message())
+
+    # Check for leading characters before {
+    # JSON should start with { (after whitespace)
+    if text_stripped and not re.match(r'^\s*\{', text_stripped):
+        leading_chars = text_stripped[:50]
+        raise InvalidJSONPrefixError(InvalidJSONPrefixError.create_message(leading_chars))
+
+    # Check for text after the closing }
+    last_brace_pos = text_stripped.rfind('}')
+    if last_brace_pos != -1:
+        text_after = text_stripped[last_brace_pos + 1:].strip()
+        if text_after:
+            raise InvalidJSONSuffixError(InvalidJSONSuffixError.create_message(text_after))
 
 
 def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:
