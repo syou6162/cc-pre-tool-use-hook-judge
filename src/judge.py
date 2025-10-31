@@ -1,7 +1,6 @@
 """Main judgment logic for PreToolUse hook validation."""
 
 import json
-import re
 from typing import Any
 
 import anyio
@@ -92,21 +91,42 @@ def _validate_response_format(text: str) -> None:
     """
     text_stripped = text.strip()
 
-    # Check for code fences - most specific check first
-    if re.search(r'```', text_stripped):
+    if '```' in text_stripped:
         raise CodeFenceInResponseError()
 
-    # Check for leading characters before {
-    # JSON should start with { (after whitespace)
-    if text_stripped and not re.match(r'^\s*\{', text_stripped):
+    if text_stripped and not text_stripped.startswith('{'):
         raise InvalidJSONPrefixError()
 
-    # Check for text after the closing }
-    last_brace_pos = text_stripped.rfind('}')
-    if last_brace_pos != -1:
-        text_after = text_stripped[last_brace_pos + 1:].strip()
-        if text_after:
-            raise InvalidJSONSuffixError()
+    if text_stripped and not text_stripped.endswith('}'):
+        raise InvalidJSONSuffixError()
+
+
+def _create_retry_error_message(e: Exception) -> str:
+    """Create retry error message based on exception type.
+
+    Args:
+        e: The exception that occurred
+
+    Returns:
+        Formatted error message for retry
+    """
+    if isinstance(e, InvalidResponseFormatError):
+        return f"{str(e)}\n\nPlease try again."
+    elif isinstance(e, json.JSONDecodeError):
+        return (
+            f"Your response could not be parsed as JSON.\n"
+            f"Error: {str(e)}\n\n"
+            f"Please return ONLY a raw JSON object starting with {{ and ending with }}.\n"
+            f"Please try again."
+        )
+    elif isinstance(e, ValueError):
+        return (
+            f"Your response did not match the required schema.\n"
+            f"Error: {str(e)}\n\n"
+            f"Please return a valid response matching the output schema."
+        )
+    else:
+        raise TypeError(f"Unexpected exception type: {type(e)}")
 
 
 def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:
@@ -151,22 +171,17 @@ async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None 
     Raises:
         ValueError: If JSON parsing fails after retries
     """
-    # Extract tool information
     tool_name = input_data["tool_name"]
     tool_input = input_data["tool_input"]
 
-    # Create user prompt with current tool usage
     user_prompt = f"""# Current Tool Usage
 Tool: {tool_name}
 Input: {json.dumps(tool_input, indent=2)}"""
 
-    # Determine system prompt based on whether custom prompt is provided
     system_prompt: str | SystemPromptPreset
     if prompt is None:
         system_prompt = SYSTEM_PROMPT
     else:
-        # Use SystemPromptPreset when custom prompt is provided
-        # Add JSON output instructions to custom prompt
         json_instructions = f"""
 
 # Output JSON Schema
@@ -186,7 +201,6 @@ Output JSON only, no other text, no code blocks, no formatting."""
             append=prompt + json_instructions
         )
 
-    # Configure Claude Agent options with retry support
     # Note: Only pass allowed_tools if explicitly set (not None) to preserve SDK defaults
     options_dict: dict[str, Any] = {
         "system_prompt": system_prompt,
@@ -199,16 +213,12 @@ Output JSON only, no other text, no code blocks, no formatting."""
 
     options = ClaudeAgentOptions(**options_dict)
 
-    # Use ClaudeSDKClient for bidirectional conversation
     async with ClaudeSDKClient(options=options) as client:
         await client.query(user_prompt)
 
-        # Try to get valid JSON response with retry
         for attempt in range(MAX_RETRY_ATTEMPTS):
-            # Receive response
             response_text = await _receive_text_response(client)
 
-            # Check if we got any response
             if not response_text:
                 if attempt < MAX_RETRY_ATTEMPTS - 1:
                     await client.query(
@@ -219,65 +229,27 @@ Output JSON only, no other text, no code blocks, no formatting."""
                     f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
                 )
 
-            # Try to parse JSON and validate output
             try:
-                # Validate response format before parsing
                 _validate_response_format(response_text)
-
-                # Parse JSON
                 output_data = json.loads(response_text)
                 output_data = _wrap_output_if_needed(output_data)
-
-                # Validate output against schema
                 validate_pretooluse_output(output_data)
                 return output_data
 
-            except InvalidResponseFormatError as e:
-                # Response format is invalid (code fences, emoji, trailing text, etc.)
+            except (InvalidResponseFormatError, json.JSONDecodeError, ValueError) as e:
                 if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    error_message = (
-                        f"{str(e)}\n\n"
-                        f"Your response:\n{response_text}\n\n"
-                        f"Please try again."
-                    )
+                    error_message = _create_retry_error_message(e)
                     await client.query(error_message)
                     continue
-                raise InvalidJSONError(
-                    f"Failed to get valid response format after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
-                )
 
-            except json.JSONDecodeError as e:
-                # JSON parsing failed
-                if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    # Show the full response text to help debug
-                    error_message = (
-                        f"Your response could not be parsed as JSON.\n"
-                        f"Error: {str(e)}\n\n"
-                        f"Received text:\n{response_text}\n\n"
-                        f"Please return ONLY a raw JSON object starting with {{ and ending with }}.\n"
-                        f"Please try again."
+                if isinstance(e, ValueError):
+                    raise SchemaValidationError(
+                        f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                     )
-                    await client.query(error_message)
-                    continue
-                raise InvalidJSONError(
-                    f"Failed to parse valid JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
-                )
-
-            except ValueError as e:
-                # Schema validation failed
-                if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    # Show the full response and parsed data
-                    error_message = (
-                        f"Your response did not match the required schema.\n"
-                        f"Error: {str(e)}\n\n"
-                        f"Received text:\n{response_text}\n\n"
-                        f"Please return a valid response matching the output schema."
+                else:
+                    raise InvalidJSONError(
+                        f"Failed to get valid response after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                     )
-                    await client.query(error_message)
-                    continue
-                raise SchemaValidationError(
-                    f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
-                )
 
     # This line is unreachable but required for mypy type checking
     raise AssertionError("Unreachable code")
