@@ -94,20 +94,19 @@ def _validate_response_format(text: str) -> None:
 
     # Check for code fences - most specific check first
     if re.search(r'```', text_stripped):
-        raise CodeFenceInResponseError(CodeFenceInResponseError.create_message())
+        raise CodeFenceInResponseError()
 
     # Check for leading characters before {
     # JSON should start with { (after whitespace)
     if text_stripped and not re.match(r'^\s*\{', text_stripped):
-        leading_chars = text_stripped[:50]
-        raise InvalidJSONPrefixError(InvalidJSONPrefixError.create_message(leading_chars))
+        raise InvalidJSONPrefixError()
 
     # Check for text after the closing }
     last_brace_pos = text_stripped.rfind('}')
     if last_brace_pos != -1:
         text_after = text_stripped[last_brace_pos + 1:].strip()
         if text_after:
-            raise InvalidJSONSuffixError(InvalidJSONSuffixError.create_message(text_after))
+            raise InvalidJSONSuffixError()
 
 
 def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:

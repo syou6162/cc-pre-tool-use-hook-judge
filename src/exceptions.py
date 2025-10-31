@@ -22,13 +22,8 @@ class InvalidResponseFormatError(JudgeError):
 class CodeFenceInResponseError(InvalidResponseFormatError):
     """Response contains markdown code fences (```)."""
 
-    @staticmethod
-    def create_message() -> str:
-        """Create detailed error message for code fence error.
-
-        Returns:
-            Formatted error message with examples
-        """
+    def __str__(self) -> str:
+        """Return detailed error message with examples."""
         return """Your response contains markdown code fences (```).
 Do NOT wrap the JSON in markdown code blocks like ```json ... ```.
 Return ONLY the raw JSON object.
@@ -45,58 +40,40 @@ CORRECT:
 class InvalidJSONPrefixError(InvalidResponseFormatError):
     """Response has invalid characters before the JSON object (e.g., emoji, text)."""
 
-    @staticmethod
-    def create_message(leading_chars: str) -> str:
-        """Create detailed error message for invalid prefix error.
-
-        Args:
-            leading_chars: The leading characters found before JSON
-
-        Returns:
-            Formatted error message with examples
-        """
-        return f"""Your response has invalid characters before the JSON object.
-Found: {repr(leading_chars)}
+    def __str__(self) -> str:
+        """Return detailed error message with examples."""
+        return """Your response has invalid characters before the JSON object.
 
 Do NOT include:
 - Emojis (⏺, ✓, etc.)
 - Explanatory text ('Sure!', 'Here is the result:', etc.)
 - Any other characters
 
-Your response must start directly with {{}}.
+Your response must start directly with {.
 
 WRONG:
-⏺ {{'permissionDecision': 'allow'}}
-Sure! Here is the JSON: {{'permissionDecision': 'allow'}}
+⏺ {'permissionDecision': 'allow'}
+Sure! Here is the JSON: {'permissionDecision': 'allow'}
 
 CORRECT:
-{{'permissionDecision': 'allow'}}"""
+{'permissionDecision': 'allow'}"""
 
 
 class InvalidJSONSuffixError(InvalidResponseFormatError):
     """Response has text after the closing brace of JSON object."""
 
-    @staticmethod
-    def create_message(trailing_text: str) -> str:
-        """Create detailed error message for invalid suffix error.
-
-        Args:
-            trailing_text: The trailing text found after JSON
-
-        Returns:
-            Formatted error message with examples
-        """
-        return f"""Your response has text after the closing }}.
-Found: {repr(trailing_text)}
+    def __str__(self) -> str:
+        """Return detailed error message with examples."""
+        return """Your response has text after the closing }.
 
 Do NOT include explanatory text after the JSON.
 
 WRONG:
-{{'permissionDecision': 'allow'}}
+{'permissionDecision': 'allow'}
 Hope this helps!
 
 CORRECT:
-{{'permissionDecision': 'allow'}}"""
+{'permissionDecision': 'allow'}"""
 
 
 class NoResponseError(JudgeError):
