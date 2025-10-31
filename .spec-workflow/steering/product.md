@@ -47,6 +47,45 @@ Claude CodeのPreToolUseフック向けのLLMベース検証ツール。ツー�
 3. **実例から学ぶ**: GitやBigQueryなど実用的な例を提供し、すぐに使える状態にする
 4. **透明性**: 判定理由を必ず出力し、なぜブロックされたかを明確にする
 
+## 使用例
+
+### Claude Codeのデフォルトフックとして使う
+
+GitHubリポジトリから直接実行する最もシンプルな方法：
+
+```json
+# .claude/hooks.json
+{
+  "hooks": [
+    {
+      "eventName": "PreToolUse",
+      "command": "uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_bq_query"
+    }
+  ]
+}
+```
+
+この設定では、全てのツール実行前にBigQueryバリデータが動作します。
+
+### cchookと組み合わせて使う（推奨）
+
+[cchook](https://github.com/syou6162/cchook)と組み合わせることで、特定のコマンドのみをバリデートできます：
+
+```yaml
+# .cchook/config.yaml
+preToolUse:
+  - matcher: "Bash"
+    conditions:
+      - type: command_starts_with
+        value: "bq query"
+    actions:
+      - type: command
+        exit_status: 0 # JSON Outputで制御するので、exit_statusはこれでよい
+        command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_bq_query
+```
+
+この設定により、`bq query`コマンドのみがバリデーションの対象になります。
+
 ## Monitoring & Visibility (if applicable)
 
 本ツール自体は単発のCLIツールとして動作し、ダッシュボードは不要。
