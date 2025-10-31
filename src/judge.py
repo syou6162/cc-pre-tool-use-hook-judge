@@ -220,10 +220,6 @@ Output JSON only, no other text, no code blocks, no formatting."""
             response_text = await _receive_text_response(client)
 
             if not response_text:
-                if attempt == MAX_RETRY_ATTEMPTS - 1:
-                    raise NoResponseError(
-                        f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
-                    )
                 query_message = "Please provide a response in valid JSON format."
                 continue
 
@@ -250,8 +246,11 @@ Output JSON only, no other text, no code blocks, no formatting."""
                 query_message = _create_retry_error_message(e)
                 continue
 
-    # This line is unreachable but required for mypy type checking
-    raise AssertionError("Unreachable code")
+        raise NoResponseError(
+            f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
+        )
+
+    raise AssertionError("Unreachable: async with block should always return or raise")
 
 
 def judge_pretooluse(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
