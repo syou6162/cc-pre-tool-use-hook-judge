@@ -148,13 +148,13 @@ stdout (JSON)
   - JSON解析エラー・スキーマ検証エラーのハンドリング
   - 出力データのラッピング（hookSpecificOutput形式）
 - **主要関数**:
-  - `judge_pretooluse(input_data, prompt=None)`: 同期版エントリーポイント（anyio.run()のラッパー）
-  - `judge_pretooluse_async(input_data, prompt=None)`: 非同期版メインロジック（リトライループ）
+  - `judge_pretooluse(input_data, prompt)`: 同期版エントリーポイント（anyio.run()のラッパー）
+  - `judge_pretooluse_async(input_data, prompt)`: 非同期版メインロジック（リトライループ）
   - `_receive_text_response()`: Claude Agent SDKからのテキスト受信
   - `_wrap_output_if_needed()`: 出力データのラッピング
 - **SystemPromptPreset**:
-  - `prompt=None`: 既存のSYSTEM_PROMPT文字列を使用
-  - `prompt="..."`: `{"type": "preset", "preset": "claude_code", "append": prompt}`を使用
+  - カスタムプロンプト（YAML設定ファイルから読み込み）をClaude Codeシステムプロンプトに追加: `{"type": "preset", "preset": "claude_code", "append": prompt}`
+  - promptパラメータは必須（YAML設定のpromptフィールドも必須）
 - **注意点**:
   - テストが難しい（SDK依存が強い、モックが複雑）
   - リトライ時はSDKの会話機能を使ってエラー内容を伝える

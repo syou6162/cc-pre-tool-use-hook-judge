@@ -13,12 +13,17 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import SystemPromptPreset
 
 from src.constants import (
-    DEFAULT_PERMISSION_DECISION,
-    DEFAULT_PERMISSION_REASON,
-    HOOK_EVENT_NAME,
     MAX_RETRY_ATTEMPTS,
 )
-from src.exceptions import InvalidJSONError, NoResponseError, SchemaValidationError
+from src.exceptions import (
+    CodeFenceInResponseError,
+    InvalidJSONError,
+    InvalidJSONPrefixError,
+    InvalidJSONSuffixError,
+    InvalidResponseFormatError,
+    NoResponseError,
+    SchemaValidationError,
+)
 from src.schema import (
     PRETOOLUSE_INPUT_SCHEMA,
     PRETOOLUSE_OUTPUT_SCHEMA,
@@ -28,7 +33,7 @@ from src.schema import (
 # System prompt with JSON schemas
 SYSTEM_PROMPT = f"""You are a PreToolUse hook validator for Claude Code.
 
-Your task is to validate tool usage and return a decision.
+Your task is to validate tool usage and return a decision based on the validation rules provided in the custom prompt.
 
 # Input JSON Schema
 {json.dumps(PRETOOLUSE_INPUT_SCHEMA, indent=2)}
@@ -36,15 +41,14 @@ Your task is to validate tool usage and return a decision.
 # Output JSON Schema
 {json.dumps(PRETOOLUSE_OUTPUT_SCHEMA, indent=2)}
 
-For now, always return a decision to ALLOW the operation with a simple reason.
+IMPORTANT: Return ONLY a valid JSON matching the output schema. Do NOT wrap it in markdown code blocks or add any other text.
 
-IMPORTANT: Return ONLY raw JSON. Do NOT wrap it in markdown code blocks (```json or ```).
+If you cannot determine whether to allow or deny based on the provided rules, default to DENY for safety.
 
-Return ONLY a valid JSON matching the output schema, with:
-- permissionDecision: "allow"
-- permissionDecisionReason: A brief explanation
+---
 
-Output JSON only, no other text, no code blocks, no formatting."""
+# Custom Validation Rules
+The following section contains the custom validation rules for this specific validator:"""
 
 
 async def _receive_text_response(client: ClaudeSDKClient) -> str:
@@ -65,37 +69,67 @@ async def _receive_text_response(client: ClaudeSDKClient) -> str:
     return response_text
 
 
-def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:
-    """Wrap output data in hookSpecificOutput format if not already wrapped.
+def _validate_response_format(text: str) -> None:
+    """Validate response text format before JSON parsing.
+
+    Checks for common formatting issues and raises specific errors:
+    - Code fences (```json or ```)
+    - Leading emoji or special characters before {
+    - Text before or after JSON
 
     Args:
-        output_data: Raw output data from Claude Agent SDK
+        text: Response text to validate
+
+    Raises:
+        CodeFenceInResponseError: If response contains markdown code fences
+        InvalidJSONPrefixError: If response has invalid prefix before JSON
+        InvalidJSONSuffixError: If response has text after JSON
+    """
+    text_stripped = text.strip()
+
+    if '```' in text_stripped:
+        raise CodeFenceInResponseError()
+
+    if text_stripped and not text_stripped.startswith('{'):
+        raise InvalidJSONPrefixError()
+
+    if text_stripped and not text_stripped.endswith('}'):
+        raise InvalidJSONSuffixError()
+
+
+def _create_retry_error_message(e: Exception) -> str:
+    """Create retry error message based on exception type.
+
+    Args:
+        e: The exception that occurred
 
     Returns:
-        Output data wrapped in hookSpecificOutput format
+        Formatted error message for retry
     """
-    if "hookSpecificOutput" not in output_data:
-        return {
-            "hookSpecificOutput": {
-                "hookEventName": HOOK_EVENT_NAME,
-                "permissionDecision": output_data.get(
-                    "permissionDecision", DEFAULT_PERMISSION_DECISION
-                ),
-                "permissionDecisionReason": output_data.get(
-                    "permissionDecisionReason", DEFAULT_PERMISSION_REASON
-                ),
-            }
-        }
-    return output_data
+    if isinstance(e, InvalidResponseFormatError):
+        return str(e)
+    elif isinstance(e, json.JSONDecodeError):
+        return (
+            f"Your response could not be parsed as JSON.\n"
+            f"Error: {str(e)}\n\n"
+            f"Please return ONLY a raw JSON object starting with {{ and ending with }}."
+        )
+    elif isinstance(e, ValueError):
+        return (
+            f"Your response did not match the required schema.\n"
+            f"Error: {str(e)}\n\n"
+            f"Please return a valid response matching the output schema."
+        )
+    else:
+        raise TypeError(f"Unexpected exception type: {type(e)}")
 
 
-async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
+async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (async).
 
     Args:
         input_data: Validated PreToolUse hook input dictionary
-        prompt: Optional custom prompt to append to the default system prompt.
-                If None, uses SYSTEM_PROMPT as-is.
+        prompt: Custom prompt to append to the Claude Code system prompt.
         model: Optional model name to use for the judgment.
                If None, uses the default model.
         allowed_tools: Optional list of allowed tool names for Claude Agent SDK.
@@ -107,42 +141,15 @@ async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str | None 
     Raises:
         ValueError: If JSON parsing fails after retries
     """
-    # Extract tool information
-    tool_name = input_data["tool_name"]
-    tool_input = input_data["tool_input"]
-
-    # Create user prompt with current tool usage
     user_prompt = f"""# Current Tool Usage
-Tool: {tool_name}
-Input: {json.dumps(tool_input, indent=2)}"""
+{json.dumps(input_data, indent=2)}"""
 
-    # Determine system prompt based on whether custom prompt is provided
-    system_prompt: str | SystemPromptPreset
-    if prompt is None:
-        system_prompt = SYSTEM_PROMPT
-    else:
-        # Use SystemPromptPreset when custom prompt is provided
-        # Add JSON output instructions to custom prompt
-        json_instructions = f"""
+    system_prompt = SystemPromptPreset(
+        type="preset",
+        preset="claude_code",
+        append=SYSTEM_PROMPT + "\n\n" + prompt
+    )
 
-# Output JSON Schema
-{json.dumps(PRETOOLUSE_OUTPUT_SCHEMA, indent=2)}
-
-IMPORTANT: Return ONLY raw JSON. Do NOT wrap it in markdown code blocks (```json or ```).
-
-Return ONLY a valid JSON matching the output schema, with:
-- permissionDecision: "allow", "deny", or "ask"
-- permissionDecisionReason: A brief explanation
-
-Output JSON only, no other text, no code blocks, no formatting."""
-
-        system_prompt = SystemPromptPreset(
-            type="preset",
-            preset="claude_code",
-            append=prompt + json_instructions
-        )
-
-    # Configure Claude Agent options with retry support
     # Note: Only pass allowed_tools if explicitly set (not None) to preserve SDK defaults
     options_dict: dict[str, Any] = {
         "system_prompt": system_prompt,
@@ -155,68 +162,52 @@ Output JSON only, no other text, no code blocks, no formatting."""
 
     options = ClaudeAgentOptions(**options_dict)
 
-    # Use ClaudeSDKClient for bidirectional conversation
     async with ClaudeSDKClient(options=options) as client:
-        await client.query(user_prompt)
+        query_message = user_prompt
 
-        # Try to get valid JSON response with retry
         for attempt in range(MAX_RETRY_ATTEMPTS):
-            # Receive response
+            await client.query(query_message)
             response_text = await _receive_text_response(client)
 
-            # Check if we got any response
             if not response_text:
-                if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    await client.query(
-                        "Please provide a response in valid JSON format."
-                    )
-                    continue
-                raise NoResponseError(
-                    f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
-                )
+                query_message = "Please provide a response in valid JSON format."
+                continue
 
-            # Try to parse JSON and validate output
             try:
+                _validate_response_format(response_text)
                 output_data = json.loads(response_text)
-                output_data = _wrap_output_if_needed(output_data)
-                # Validate output against schema
                 validate_pretooluse_output(output_data)
                 return output_data
 
-            except json.JSONDecodeError as e:
-                # JSON parsing failed
-                if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    await client.query(
-                        f"Your previous response was not valid JSON. Error: {str(e)}. "
-                        "Please return ONLY raw JSON without any markdown formatting or code blocks."
-                    )
-                    continue
-                raise InvalidJSONError(
-                    f"Failed to parse valid JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
-                )
-            except ValueError as e:
-                # Schema validation failed
-                if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    await client.query(
-                        f"Your previous response did not match the required schema. Error: {str(e)}. "
-                        "Please return a valid response matching the output schema."
-                    )
-                    continue
-                raise SchemaValidationError(
-                    f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
-                )
+            except (InvalidResponseFormatError, json.JSONDecodeError, ValueError) as e:
+                if attempt == MAX_RETRY_ATTEMPTS - 1:
+                    if isinstance(e, ValueError):
+                        raise SchemaValidationError(
+                            f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
+                        )
+                    elif isinstance(e, json.JSONDecodeError):
+                        raise InvalidJSONError(
+                            f"Failed to parse JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
+                        )
+                    else:
+                        raise
 
-    # This line is unreachable but required for mypy type checking
-    raise AssertionError("Unreachable code")
+                query_message = _create_retry_error_message(e)
+                continue
+
+        raise NoResponseError(
+            f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
+        )
+
+    raise AssertionError("Unreachable: async with block should always return or raise")
 
 
-def judge_pretooluse(input_data: dict[str, Any], prompt: str | None = None, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
+def judge_pretooluse(input_data: dict[str, Any], prompt: str, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (sync wrapper).
 
     Args:
         input_data: Validated PreToolUse hook input dictionary
-        prompt: Optional custom prompt to append to the default system prompt.
-                If None, uses SYSTEM_PROMPT as-is.
+        prompt: Custom prompt to append to the Claude Code system prompt.
         model: Optional model name to use for the judgment.
                If None, uses the default model.
         allowed_tools: Optional list of allowed tool names for Claude Agent SDK.
