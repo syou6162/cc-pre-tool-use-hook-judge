@@ -213,9 +213,10 @@ Output JSON only, no other text, no code blocks, no formatting."""
     options = ClaudeAgentOptions(**options_dict)
 
     async with ClaudeSDKClient(options=options) as client:
-        await client.query(user_prompt)
+        query_message = user_prompt
 
         for attempt in range(MAX_RETRY_ATTEMPTS):
+            await client.query(query_message)
             response_text = await _receive_text_response(client)
 
             if not response_text:
@@ -223,7 +224,7 @@ Output JSON only, no other text, no code blocks, no formatting."""
                     raise NoResponseError(
                         f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
                     )
-                await client.query("Please provide a response in valid JSON format.")
+                query_message = "Please provide a response in valid JSON format."
                 continue
 
             try:
@@ -246,8 +247,8 @@ Output JSON only, no other text, no code blocks, no formatting."""
                     else:
                         raise
 
-                error_message = _create_retry_error_message(e)
-                await client.query(error_message)
+                query_message = _create_retry_error_message(e)
+                continue
 
     # This line is unreachable but required for mypy type checking
     raise AssertionError("Unreachable code")
