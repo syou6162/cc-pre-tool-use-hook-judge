@@ -111,6 +111,59 @@ mcp__codex__codex(prompt="設定を変更して", cwd="/etc")
 # → 理由: 意図しないディレクトリでの操作
 ```
 
+#### Git Pushバリデータ
+
+```json
+# .claude/hooks.json
+{
+  "hooks": [
+    {
+      "eventName": "PreToolUse",
+      "command": "uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_git_push"
+    }
+  ]
+}
+```
+
+この設定では、全てのツール実行前にGit pushバリデータが動作します。
+
+**動作例:**
+
+安全なpush（ALLOW）:
+```bash
+# 現在のブランチ（例: feature/new-feature）をpush
+git push
+# → permissionDecision: "allow"
+# → 理由: 現在のブランチをpush
+
+git push origin feature/new-feature
+# → permissionDecision: "allow"
+# → 理由: 現在のブランチと同じ名前のリモートブランチへのpush
+```
+
+危険なpush（DENY）:
+```bash
+git push origin main
+# → permissionDecision: "deny"
+# → 理由: mainブランチへのpushは禁止
+
+git push origin master
+# → permissionDecision: "deny"
+# → 理由: masterブランチへのpushは禁止
+
+git push --force origin feature/new-feature
+# → permissionDecision: "deny"
+# → 理由: force pushは禁止
+
+git push -f origin feature/new-feature
+# → permissionDecision: "deny"
+# → 理由: force pushは禁止
+
+git push origin HEAD
+# → permissionDecision: "deny"
+# → 理由: HEADの使用は禁止、明示的なブランチ名を指定してください
+```
+
 ### cchookと組み合わせて使う（推奨）
 
 [cchook](https://github.com/syou6162/cchook)を使うと、特定のコマンドのみをバリデートできます：
