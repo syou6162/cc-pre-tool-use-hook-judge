@@ -54,6 +54,22 @@ GitHubリポジトリから直接実行する最もシンプルな方法です�
 
 この設定では、MCP経由でCodexツールを実行する際の安全性をチェックします。
 
+#### Git Pushバリデータ
+
+```json
+# .claude/hooks.json
+{
+  "hooks": [
+    {
+      "eventName": "PreToolUse",
+      "command": "uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_git_push"
+    }
+  ]
+}
+```
+
+この設定では、全てのツール実行前にGit pushバリデータが動作します。
+
 ### cchookと組み合わせて使う（推奨）
 
 [cchook](https://github.com/syou6162/cchook)と組み合わせることで、特定のコマンドのみをバリデートできます：
@@ -88,6 +104,23 @@ preToolUse:
 ```
 
 この設定により、MCP Codexツールの実行時のみがバリデーションの対象になります。
+
+#### Git Pushバリデータ
+
+```yaml
+# .cchook/config.yaml
+preToolUse:
+  - matcher: "Bash"
+    conditions:
+      - type: command_starts_with
+        value: "git push"
+    actions:
+      - type: command
+        exit_status: 0 # JSON Outputで制御するので、exit_statusはこれでよい
+        command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_git_push
+```
+
+この設定により、`git push`コマンドのみがバリデーションの対象になります。
 
 ## アーキテクチャ
 
@@ -218,6 +251,23 @@ stdout (JSON)
   - 危険な操作（DDL、DML、DCL、BigQuery ML、危険なオプション）
 - **使用方法**: `--builtin validate_bq_query`で指定
 
+#### 9. `builtin_configs/validate_codex_mcp.yaml`
+- **役割**: Codex MCPバリデータのビルトイン設定
+- **内容**:
+  - MCP経由でCodexツールを実行する際の安全性判定ルール
+  - 安全な設定（read-only sandbox、適切なapproval-policy）
+  - 危険な設定（danger-full-access、approval-policy=never、別ディレクトリでの実行）
+- **使用方法**: `--builtin validate_codex_mcp`で指定
+
+#### 10. `builtin_configs/validate_git_push.yaml`
+- **役割**: Git Pushバリデータのビルトイン設定
+- **内容**:
+  - git pushコマンドの安全性判定ルール
+  - 安全な操作（現在のブランチと同じ名前のリモートブランチへのpush）
+  - 危険な操作（main/masterブランチへのpush、force push、HEADの使用）
+  - Bashツールを使用して現在のブランチ名を確認
+- **使用方法**: `--builtin validate_git_push`で指定
+
 ## コーディング規約
 
 ### 型アノテーション
@@ -290,7 +340,8 @@ uv run cc-pre-tool-use-hook-judge --config custom_validator.yaml
 cc-pre-tool-use-hook-judge/
 ├── builtin_configs/
 │   ├── validate_bq_query.yaml   # BigQueryバリデータ設定
-│   └── validate_codex_mcp.yaml  # Codex MCPバリデータ設定
+│   ├── validate_codex_mcp.yaml  # Codex MCPバリデータ設定
+│   └── validate_git_push.yaml   # Git Pushバリデータ設定
 ├── src/
 │   ├── __init__.py              # 空
 │   ├── __main__.py              # main()関数、CLIエントリーポイント
