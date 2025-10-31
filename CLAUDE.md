@@ -22,6 +22,8 @@ Claude CodeのPreToolUseフック用のバリデーター・判定システム�
 
 GitHubリポジトリから直接実行する最もシンプルな方法です：
 
+#### BigQueryバリデータ
+
 ```json
 # .claude/hooks.json
 {
@@ -36,9 +38,27 @@ GitHubリポジトリから直接実行する最もシンプルな方法です�
 
 この設定では、全てのツール実行前にBigQueryバリデータが動作します。
 
+#### Codex MCPバリデータ
+
+```json
+# .claude/hooks.json
+{
+  "hooks": [
+    {
+      "eventName": "PreToolUse",
+      "command": "uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_codex_mcp"
+    }
+  ]
+}
+```
+
+この設定では、MCP経由でCodexツールを実行する際の安全性をチェックします。
+
 ### cchookと組み合わせて使う（推奨）
 
 [cchook](https://github.com/syou6162/cchook)と組み合わせることで、特定のコマンドのみをバリデートできます：
+
+#### BigQueryバリデータ
 
 ```yaml
 # .cchook/config.yaml
@@ -54,6 +74,20 @@ preToolUse:
 ```
 
 この設定により、`bq query`コマンドのみがバリデーションの対象になります。
+
+#### Codex MCPバリデータ
+
+```yaml
+# .cchook/config.yaml
+preToolUse:
+  - matcher: "mcp__codex__codex"
+    actions:
+      - type: command
+        exit_status: 0 # JSON Outputで制御するので、exit_statusはこれでよい
+        command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_codex_mcp
+```
+
+この設定により、MCP Codexツールの実行時のみがバリデーションの対象になります。
 
 ## アーキテクチャ
 
@@ -255,7 +289,8 @@ uv run cc-pre-tool-use-hook-judge --config custom_validator.yaml
 ```
 cc-pre-tool-use-hook-judge/
 ├── builtin_configs/
-│   └── validate_bq_query.yaml   # BigQueryバリデータ設定
+│   ├── validate_bq_query.yaml   # BigQueryバリデータ設定
+│   └── validate_codex_mcp.yaml  # Codex MCPバリデータ設定
 ├── src/
 │   ├── __init__.py              # 空
 │   ├── __main__.py              # main()関数、CLIエントリーポイント
