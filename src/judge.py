@@ -179,7 +179,7 @@ Input: {json.dumps(tool_input, indent=2)}"""
     system_prompt = SystemPromptPreset(
         type="preset",
         preset="claude_code",
-        append=prompt
+        append=SYSTEM_PROMPT + "\n\n" + prompt
     )
 
     # Note: Only pass allowed_tools if explicitly set (not None) to preserve SDK defaults
