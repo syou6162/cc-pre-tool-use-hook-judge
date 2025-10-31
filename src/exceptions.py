@@ -52,11 +52,11 @@ Do NOT include:
 Your response must start directly with {.
 
 WRONG:
-⏺ {'permissionDecision': 'allow'}
-Sure! Here is the JSON: {'permissionDecision': 'allow'}
+⏺ {"permissionDecision": "allow"}
+Sure! Here is the JSON: {"permissionDecision": "allow"}
 
 CORRECT:
-{'permissionDecision': 'allow'}"""
+{"permissionDecision": "allow"}"""
 
 
 class InvalidJSONSuffixError(InvalidResponseFormatError):
@@ -69,11 +69,11 @@ class InvalidJSONSuffixError(InvalidResponseFormatError):
 Do NOT include explanatory text after the JSON.
 
 WRONG:
-{'permissionDecision': 'allow'}
+{"permissionDecision": "allow"}
 Hope this helps!
 
 CORRECT:
-{'permissionDecision': 'allow'}"""
+{"permissionDecision": "allow"}"""
 
 
 class NoResponseError(JudgeError):
