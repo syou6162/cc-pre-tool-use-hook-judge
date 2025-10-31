@@ -43,11 +43,14 @@ GitHubリポジトリから直接実行する最もシンプルな方法です�
 ```yaml
 # .cchook/config.yaml
 preToolUse:
-  - matcher:
-      toolName: Bash
-      toolInput:
-        command: "^bq query"
-    command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_bq_query
+  - matcher: "Bash"
+    conditions:
+      - type: command_starts_with
+        value: "bq query"
+    actions:
+      - type: command
+        exit_status: 0 # JSON Outputで制御するので、exit_statusはこれでよい
+        command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_bq_query
 ```
 
 この設定により、`bq query`コマンドのみがバリデーションの対象になります。
