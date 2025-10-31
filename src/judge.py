@@ -13,9 +13,6 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import SystemPromptPreset
 
 from src.constants import (
-    DEFAULT_PERMISSION_DECISION,
-    DEFAULT_PERMISSION_REASON,
-    HOOK_EVENT_NAME,
     MAX_RETRY_ATTEMPTS,
 )
 from src.exceptions import (
@@ -36,7 +33,7 @@ from src.schema import (
 # System prompt with JSON schemas
 SYSTEM_PROMPT = f"""You are a PreToolUse hook validator for Claude Code.
 
-Your task is to validate tool usage and return a decision.
+Your task is to validate tool usage and return a decision based on the validation rules provided in the custom prompt.
 
 # Input JSON Schema
 {json.dumps(PRETOOLUSE_INPUT_SCHEMA, indent=2)}
@@ -44,15 +41,14 @@ Your task is to validate tool usage and return a decision.
 # Output JSON Schema
 {json.dumps(PRETOOLUSE_OUTPUT_SCHEMA, indent=2)}
 
-For now, always return a decision to ALLOW the operation with a simple reason.
+IMPORTANT: Return ONLY a valid JSON matching the output schema. Do NOT wrap it in markdown code blocks or add any other text.
 
-IMPORTANT: Return ONLY raw JSON. Do NOT wrap it in markdown code blocks (```json or ```).
+If you cannot determine whether to allow or deny based on the provided rules, default to DENY for safety.
 
-Return ONLY a valid JSON matching the output schema, with:
-- permissionDecision: "allow"
-- permissionDecisionReason: A brief explanation
+---
 
-Output JSON only, no other text, no code blocks, no formatting."""
+# Custom Validation Rules
+The following section contains the custom validation rules for this specific validator:"""
 
 
 async def _receive_text_response(client: ClaudeSDKClient) -> str:
