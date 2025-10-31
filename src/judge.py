@@ -219,14 +219,12 @@ Output JSON only, no other text, no code blocks, no formatting."""
             response_text = await _receive_text_response(client)
 
             if not response_text:
-                if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    await client.query(
-                        "Please provide a response in valid JSON format."
+                if attempt == MAX_RETRY_ATTEMPTS - 1:
+                    raise NoResponseError(
+                        f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
                     )
-                    continue
-                raise NoResponseError(
-                    f"No response received from Claude Agent SDK after {MAX_RETRY_ATTEMPTS} attempts"
-                )
+                await client.query("Please provide a response in valid JSON format.")
+                continue
 
             try:
                 _validate_response_format(response_text)
@@ -236,21 +234,20 @@ Output JSON only, no other text, no code blocks, no formatting."""
                 return output_data
 
             except (InvalidResponseFormatError, json.JSONDecodeError, ValueError) as e:
-                if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    error_message = _create_retry_error_message(e)
-                    await client.query(error_message)
-                    continue
+                if attempt == MAX_RETRY_ATTEMPTS - 1:
+                    if isinstance(e, ValueError):
+                        raise SchemaValidationError(
+                            f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
+                        )
+                    elif isinstance(e, json.JSONDecodeError):
+                        raise InvalidJSONError(
+                            f"Failed to parse JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
+                        )
+                    else:
+                        raise
 
-                if isinstance(e, ValueError):
-                    raise SchemaValidationError(
-                        f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
-                    )
-                elif isinstance(e, json.JSONDecodeError):
-                    raise InvalidJSONError(
-                        f"Failed to parse JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
-                    )
-                else:
-                    raise
+                error_message = _create_retry_error_message(e)
+                await client.query(error_message)
 
     # This line is unreachable but required for mypy type checking
     raise AssertionError("Unreachable code")
