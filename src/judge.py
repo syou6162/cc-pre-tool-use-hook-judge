@@ -128,30 +128,6 @@ def _create_retry_error_message(e: Exception) -> str:
         raise TypeError(f"Unexpected exception type: {type(e)}")
 
 
-def _wrap_output_if_needed(output_data: dict[str, Any]) -> dict[str, Any]:
-    """Wrap output data in hookSpecificOutput format if not already wrapped.
-
-    Args:
-        output_data: Raw output data from Claude Agent SDK
-
-    Returns:
-        Output data wrapped in hookSpecificOutput format
-    """
-    if "hookSpecificOutput" not in output_data:
-        return {
-            "hookSpecificOutput": {
-                "hookEventName": HOOK_EVENT_NAME,
-                "permissionDecision": output_data.get(
-                    "permissionDecision", DEFAULT_PERMISSION_DECISION
-                ),
-                "permissionDecisionReason": output_data.get(
-                    "permissionDecisionReason", DEFAULT_PERMISSION_REASON
-                ),
-            }
-        }
-    return output_data
-
-
 async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str, model: str | None = None, allowed_tools: list[str] | None = None) -> dict[str, Any]:
     """Judge PreToolUse hook input and return decision (async).
 
@@ -204,7 +180,6 @@ async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str, model:
             try:
                 _validate_response_format(response_text)
                 output_data = json.loads(response_text)
-                output_data = _wrap_output_if_needed(output_data)
                 validate_pretooluse_output(output_data)
                 return output_data
 
