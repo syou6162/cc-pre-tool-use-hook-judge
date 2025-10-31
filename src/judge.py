@@ -222,30 +222,59 @@ Output JSON only, no other text, no code blocks, no formatting."""
 
             # Try to parse JSON and validate output
             try:
+                # Validate response format before parsing
+                _validate_response_format(response_text)
+
+                # Parse JSON
                 output_data = json.loads(response_text)
                 output_data = _wrap_output_if_needed(output_data)
+
                 # Validate output against schema
                 validate_pretooluse_output(output_data)
                 return output_data
 
+            except InvalidResponseFormatError as e:
+                # Response format is invalid (code fences, emoji, trailing text, etc.)
+                if attempt < MAX_RETRY_ATTEMPTS - 1:
+                    error_message = (
+                        f"{str(e)}\n\n"
+                        f"Your response:\n{response_text}\n\n"
+                        f"Please try again."
+                    )
+                    await client.query(error_message)
+                    continue
+                raise InvalidJSONError(
+                    f"Failed to get valid response format after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
+                )
+
             except json.JSONDecodeError as e:
                 # JSON parsing failed
                 if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    await client.query(
-                        f"Your previous response was not valid JSON. Error: {str(e)}. "
-                        "Please return ONLY raw JSON without any markdown formatting or code blocks."
+                    # Show the full response text to help debug
+                    error_message = (
+                        f"Your response could not be parsed as JSON.\n"
+                        f"Error: {str(e)}\n\n"
+                        f"Received text:\n{response_text}\n\n"
+                        f"Please return ONLY a raw JSON object starting with {{ and ending with }}.\n"
+                        f"Please try again."
                     )
+                    await client.query(error_message)
                     continue
                 raise InvalidJSONError(
                     f"Failed to parse valid JSON after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
                 )
+
             except ValueError as e:
                 # Schema validation failed
                 if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    await client.query(
-                        f"Your previous response did not match the required schema. Error: {str(e)}. "
-                        "Please return a valid response matching the output schema."
+                    # Show the full response and parsed data
+                    error_message = (
+                        f"Your response did not match the required schema.\n"
+                        f"Error: {str(e)}\n\n"
+                        f"Received text:\n{response_text}\n\n"
+                        f"Please return a valid response matching the output schema."
                     )
+                    await client.query(error_message)
                     continue
                 raise SchemaValidationError(
                     f"Failed to get valid output after {MAX_RETRY_ATTEMPTS} attempts: {str(e)}"
