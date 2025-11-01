@@ -33,22 +33,19 @@ from src.schema import (
 # System prompt with JSON schemas
 SYSTEM_PROMPT = f"""You are a PreToolUse hook validator for Claude Code.
 
-Your task is to validate tool usage and return a decision based on the validation rules provided in the custom prompt.
+Your task is to validate tool usage and return a decision based on the validation rules provided in <custom_validation_rules>.
 
-# Input JSON Schema
+<input_json_schema>
 {json.dumps(PRETOOLUSE_INPUT_SCHEMA, indent=2)}
+</input_json_schema>
 
-# Output JSON Schema
+<output_json_schema>
 {json.dumps(PRETOOLUSE_OUTPUT_SCHEMA, indent=2)}
+</output_json_schema>
 
 IMPORTANT: Return ONLY a valid JSON matching the output schema. Do NOT wrap it in markdown code blocks or add any other text.
 
-If you cannot determine whether to allow or deny based on the provided rules, default to DENY for safety.
-
----
-
-# Custom Validation Rules
-The following section contains the custom validation rules for this specific validator:"""
+If you cannot determine whether to allow or deny based on the provided rules, default to DENY for safety."""
 
 
 async def _receive_text_response(client: ClaudeSDKClient) -> str:
@@ -144,10 +141,18 @@ async def judge_pretooluse_async(input_data: dict[str, Any], prompt: str, model:
     user_prompt = f"""# Current Tool Usage
 {json.dumps(input_data, indent=2)}"""
 
+    system_prompt_text = f"""<system_instructions>
+{SYSTEM_PROMPT}
+</system_instructions>
+
+<custom_validation_rules>
+{prompt}
+</custom_validation_rules>"""
+
     system_prompt = SystemPromptPreset(
         type="preset",
         preset="claude_code",
-        append=SYSTEM_PROMPT + "\n\n" + prompt
+        append=system_prompt_text
     )
 
     # Note: Only pass allowed_tools if explicitly set (not None) to preserve SDK defaults
