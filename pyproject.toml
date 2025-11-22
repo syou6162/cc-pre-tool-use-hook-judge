@@ -27,5 +27,5 @@ dev = [
     "pytest==8.4.2",
     "ruff==0.14.2",
     "types-jsonschema==4.25.1.20251009",
-    "types-pyyaml==6.0",
+    "types-pyyaml==6.0.12.20250915",
 ]
