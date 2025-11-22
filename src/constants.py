@@ -11,6 +11,3 @@ PERMISSION_ASK = "ask"
 # Default permission decision values (default to deny for security)
 DEFAULT_PERMISSION_DECISION = PERMISSION_DENY
 DEFAULT_PERMISSION_REASON = "Invalid or missing permission decision from judgment system"
-
-# Maximum number of retry attempts for JSON parsing
-MAX_RETRY_ATTEMPTS = 3
