@@ -8,7 +8,7 @@ from typing import Any
 
 from src.config import ConfigError, load_builtin_config, load_config
 from src.constants import HOOK_EVENT_NAME, PERMISSION_DENY
-from src.exceptions import InvalidJSONError, NoResponseError, SchemaValidationError
+from src.exceptions import NoResponseError, SchemaValidationError
 from src.judge import judge_pretooluse
 from src.schema import validate_pretooluse_input
 
@@ -103,11 +103,6 @@ def main() -> None:
         # Output result to stdout
         print(json.dumps(output_data, ensure_ascii=False, indent=2))
 
-    except InvalidJSONError:
-        # JSON parsing failed - judgment system could not return valid JSON
-        reason = "判定システムが正しいJSON形式で応答できませんでした。安全のため操作を拒否します。"
-        error_output = create_error_output(reason)
-        print(json.dumps(error_output, ensure_ascii=False, indent=2))
     except NoResponseError:
         # No response received from judgment system
         reason = "判定システムから応答がありませんでした。安全のため操作を拒否します。"
