@@ -173,35 +173,38 @@ stdout (JSON)
   - 検証失敗時は`ValueError`を送出
 
 #### 3. `src/judge.py`
-- **役割**: Claude Agent SDKを使った判定ロジック
+- **役割**: Claude Agent SDKの構造化出力機能を使った判定ロジック
 - **責務**:
   - カスタムプロンプトの処理（SystemPromptPreset切り替え）
-  - Claude Agent SDKとの双方向会話
-  - リトライロジック（最大3回）
-  - JSON解析エラー・スキーマ検証エラーのハンドリング
-  - 出力データのラッピング（hookSpecificOutput形式）
+  - 構造化出力スキーマの設定（`output_format`パラメータ）
+  - Claude Agent SDKからの結果受信
 - **主要関数**:
   - `judge_pretooluse(input_data, prompt)`: 同期版エントリーポイント（anyio.run()のラッパー）
-  - `judge_pretooluse_async(input_data, prompt)`: 非同期版メインロジック（リトライループ）
-  - `_receive_text_response()`: Claude Agent SDKからのテキスト受信
-  - `_wrap_output_if_needed()`: 出力データのラッピング
+  - `judge_pretooluse_async(input_data, prompt)`: 非同期版メインロジック
+- **構造化出力の仕組み**:
+  - `output_format={"type": "json_schema", "schema": PRETOOLUSE_OUTPUT_SCHEMA}`でスキーマを指定
+  - JSON parsing、スキーマ検証、リトライは全てSDK内部で自動実行
+  - `ResultMessage.structured_output`で検証済みのJSONオブジェクトを取得
 - **SystemPromptPreset**:
   - カスタムプロンプト（YAML設定ファイルから読み込み）をClaude Codeシステムプロンプトに追加: `{"type": "preset", "preset": "claude_code", "append": prompt}`
   - promptパラメータは必須（YAML設定のpromptフィールドも必須）
+- **エラーハンドリング**:
+  - `ResultMessage.is_error`で成功/失敗を判定
+  - 失敗時は`SchemaValidationError`を送出
 - **注意点**:
   - テストが難しい（SDK依存が強い、モックが複雑）
-  - リトライ時はSDKの会話機能を使ってエラー内容を伝える
+  - 構造化出力のリトライ処理はSDK内部で自動実行される
 
 #### 4. `src/exceptions.py`
 - **役割**: カスタム例外クラスの定義
 - **設計**:
   - `JudgeError`: 基底例外クラス
-  - `InvalidJSONError`: JSON parsing失敗
   - `NoResponseError`: SDKから応答なし
-  - `SchemaValidationError`: スキーマ検証失敗
+  - `SchemaValidationError`: 構造化出力の生成失敗
 - **メリット**: 文字列パターンマッチングではなく型ベースのエラー分類が可能
+- **注意**: 構造化出力導入により、JSON parsing関連の例外クラスは削除された
 
-#### 4. `src/config.py`
+#### 5. `src/config.py`
 - **役割**: YAML設定ファイルの読み込みと検証
 - **責務**:
   - ビルトイン設定の読み込み（`builtin_configs/`ディレクトリから）
@@ -216,23 +219,13 @@ stdout (JSON)
 - **注意点**:
   - `importlib.resources`を使ってパッケージ内のビルトイン設定にアクセス
 
-#### 5. `src/models.py`
+#### 6. `src/models.py`
 - **役割**: TypedDict型定義
 - **型定義**:
   - `ConfigDict`: YAML設定構造
     - `prompt`: str（必須）
     - `model`: NotRequired[str]（オプション）
     - `allowed_tools`: NotRequired[list[str]]（オプション）
-
-#### 6. `src/exceptions.py`
-- **役割**: カスタム例外クラスの定義
-- **設計**:
-  - `JudgeError`: 基底例外クラス
-  - `InvalidJSONError`: JSON parsing失敗
-  - `NoResponseError`: SDKから応答なし
-  - `SchemaValidationError`: スキーマ検証失敗
-  - `ConfigError`: 設定ファイル読み込み失敗
-- **メリット**: 文字列パターンマッチングではなく型ベースのエラー分類が可能
 
 #### 7. `src/constants.py`
 - **役割**: アプリケーション全体で使用する定数の一元管理
@@ -241,7 +234,7 @@ stdout (JSON)
   - `PERMISSION_ALLOW/DENY/ASK`: 許可決定の値
   - `DEFAULT_PERMISSION_DECISION`: "deny"（セキュリティ優先）
   - `DEFAULT_PERMISSION_REASON`: デフォルトエラーメッセージ
-  - `MAX_RETRY_ATTEMPTS`: 3
+- **注意**: 構造化出力導入により、`MAX_RETRY_ATTEMPTS`定数は削除された（リトライはSDK内部で管理）
 
 #### 8. `builtin_configs/validate_bq_query.yaml`
 - **役割**: BigQueryクエリバリデータのビルトイン設定
@@ -415,7 +408,24 @@ cc-pre-tool-use-hook-judge/
 ### なぜjudge.pyのテストを書かないのか？
 - Claude Agent SDK依存が強い
 - モックが複雑すぎてテストの価値が低い
-- 純粋関数（`_wrap_output_if_needed`）は単純すぎてテスト不要
+- 構造化出力機能により、ほとんどのロジックがSDK内部に移行
+
+### なぜ構造化出力機能を導入したのか？（2025年11月）
+- **コード削減**: 約280行（50%）のコード削減
+  - judge.py: 228行 → 100行（-128行）
+  - exceptions.py: 89行 → 19行（-70行）
+  - test_validate_response_format.py: 85行削除
+- **保守性向上**: JSON parsing・スキーマ検証・リトライがSDK内部で自動実行
+- **信頼性向上**: Anthropic公式の実装を使用、バグ修正・改善が自動反映
+- **実装の簡素化**:
+  - 手動リトライループが不要
+  - フォーマット検証関数（`_validate_response_format`）が不要
+  - エラーメッセージ生成関数（`_create_retry_error_message`）が不要
+  - 複数のカスタム例外クラスが不要
+- **トレードオフ**:
+  - 詳細なエラー情報は失われる（コードフェンス、プレフィックス/サフィックスエラーの具体的な指摘ができない）
+  - ただし、構造化出力の成功率は高く、実用上の問題は少ない
+- **使用したSDKバージョン**: claude-agent-sdk >= 0.1.9
 
 ## よくある操作
 
