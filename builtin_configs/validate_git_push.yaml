@@ -5,24 +5,30 @@ prompt: |
   # 判定基準
 
   ## 必ず拒否する操作（permissionDecision: "deny"）
-  1. main/masterブランチへのpush
+  1. リモートまたはブランチ名が明示されていないpush
+     - `git push` のみ（引数なし）の場合
+     - `git push origin` のみ（ブランチ名なし）の場合
+     - 理由: 暗黙的なpushは誤ってmain/masterブランチにpushする危険がある
+     - 例: `git push`, `git push origin`
+
+  2. main/masterブランチへのpush
      - コマンドに "main" または "master" という文字列が含まれる場合
      - 例: `git push origin main`, `git push origin master`
 
-  2. force pushの使用
+  3. force pushの使用
      - `--force`, `-f`, `--force-with-lease`, `--force-if-includes` などのオプションが含まれる場合
      - 例: `git push --force`, `git push -f origin feature`
 
-  3. HEADの使用
+  4. HEADの使用
      - コマンドに "HEAD" という文字列が含まれる場合
      - 明示的なブランチ名を使用するべき
      - 例: `git push origin HEAD`
 
   ## 許可する操作（permissionDecision: "allow"）
-  1. 現在のブランチと同じ名前のリモートブランチへのpush
+  1. リモートとブランチ名が明示的に指定されているpush
+     - 形式: `git push <remote> <branch-name>`
      - まずBashツールで現在のブランチ名を確認: `git rev-parse --abbrev-ref HEAD`
-     - コマンドにブランチ名が明示されていない場合（`git push`のみ）
-     - コマンドに現在のブランチ名と同じ名前が含まれる場合
+     - コマンドに現在のブランチ名と同じ名前が含まれる場合のみ許可
      - 例: 現在が`feature/new-feature`の場合、`git push origin feature/new-feature`
 
   ## その他
