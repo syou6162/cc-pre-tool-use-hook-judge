@@ -7,7 +7,7 @@ name = "cc-pre-tool-use-hook-judge"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "claude-agent-sdk==0.1.9",
+    "claude-agent-sdk==0.1.10",
     "jsonschema==4.25.1",
     "pyyaml==6.0.3",
 ]
@@ -23,9 +23,9 @@ packages = ["src"]
 
 [dependency-groups]
 dev = [
-    "mypy==1.18.2",
+    "mypy==1.19.0",
     "pytest==9.0.1",
-    "ruff==0.14.6",
+    "ruff==0.14.7",
     "types-jsonschema==4.25.1.20251009",
     "types-pyyaml==6.0.12.20250915",
 ]
