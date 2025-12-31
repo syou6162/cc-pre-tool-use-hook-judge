@@ -23,7 +23,7 @@ packages = ["src"]
 
 [dependency-groups]
 dev = [
-    "mypy==1.19.0",
+    "mypy==1.19.1",
     "pytest==9.0.1",
     "ruff==0.14.10",
     "types-jsonschema==4.25.1.20251009",
