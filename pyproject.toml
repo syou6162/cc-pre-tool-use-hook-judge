@@ -25,7 +25,7 @@ packages = ["src"]
 dev = [
     "mypy==1.19.1",
     "pytest==9.0.1",
-    "ruff==0.14.10",
+    "ruff==0.15.1",
     "types-jsonschema==4.26.0.20260109",
     "types-pyyaml==6.0.12.20250915",
 ]
