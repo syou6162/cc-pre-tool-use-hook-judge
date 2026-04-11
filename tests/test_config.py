@@ -39,11 +39,16 @@ class TestBuiltinConfigLoading:
         assert "&&" in config["prompt"]
         assert "|&" in config["prompt"]
         assert "deny" in config["prompt"]
+        # sort -o はファイル書き込みを伴うためdenyであること（退行防止）
+        assert "sort -o" in config["prompt"]
 
         # ルール構造見出しが含まれること（構造退行検知）
         prompt_lower = config["prompt"].lower()
         assert "allow" in prompt_lower or "ホワイトリスト" in config["prompt"]
         assert "判断不能" in config["prompt"]
+
+        # 絶対パスを同等コマンドとして許可する旨が記載されていること（退行防止）
+        assert "絶対パス" in config["prompt"]
 
     def test_load_builtin_config_validate_xargs(self) -> None:
         """ビルトイン設定（validate_xargs.yaml）が正しく読み込めることを確認"""

@@ -169,7 +169,9 @@ preToolUse:
         command: echo '{.}' | uvx --from git+https://github.com/syou6162/cc-pre-tool-use-hook-judge cc-pre-tool-use-hook-judge --builtin validate_find
 ```
 
-この設定により、`find`コマンドのみがバリデーションの対象になります。
+この設定により、`find`コマンドのみがバリデーションの対象になります。`find ... | xargs ...`のようなパイプを含むコマンドの場合も先頭が`find`で始まるため、このバリデータが担当します（xargs部分の安全性もfindバリデータが判定します）。
+
+> **注意**: `/usr/bin/find`等の絶対パス呼び出しは`command_starts_with: "find "`ではマッチしません。絶対パスで呼ぶ場合は別途条件を追加してください。
 
 #### xargsバリデータ
 
