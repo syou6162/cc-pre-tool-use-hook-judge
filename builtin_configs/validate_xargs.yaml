@@ -25,52 +25,68 @@ prompt: |
   以下に明示されたもののみ許可します。リストにないものは全てdenyとします。
 
   #### xargsオプション（これらのみ許可）
-  - `-0`, `-null`: ヌル文字区切りの入力
+  - `-0`, `--null`: ヌル文字区切りの入力
   - `-I {}`, `-i`: 置換文字列の指定（参照系コマンドと組み合わせる場合のみ）
   - `-n NUM`: 引数の数を制限
   - `-L NUM`: 行数を制限
   - `-P NUM`: 並列実行数の指定（参照系コマンドと組み合わせる場合のみ）
+  - `-t`: 実行するコマンドを表示（デバッグ用、コマンドの安全性に影響しない）
+  - `-p`: 各コマンド実行前にユーザー確認を求める（コマンドの安全性に影響しない）
   - `--no-run-if-empty`, `-r`: 入力が空の場合は実行しない
   - `--max-args`, `--max-lines`, `--max-procs`: 各種制限オプション
 
   #### 参照系コマンド（これらのみ許可）
   以下のコマンドをxargsで実行する場合は許可します。絶対パス（例: `/usr/bin/grep`）も同等コマンドとして許可します。
-  - `xargs grep ...`
-  - `xargs cat ...`
-  - `xargs head ...`
-  - `xargs tail ...`
-  - `xargs wc ...`
-  - `xargs file ...`
-  - `xargs stat ...`
-  - `xargs ls ...`
-  - `xargs md5sum ...`
-  - `xargs sha256sum ...`
-  - `xargs md5 ...`（macOS標準）
-  - `xargs shasum ...`（macOS標準）
-  - `xargs echo ...`（確認・デバッグ用）
+  - `xargs grep ...`（検索系）
+  - `xargs rg ...`（検索系）
+  - `xargs ag ...`（検索系）
+  - `xargs ack ...`（検索系）
+  - `xargs cat ...`（表示系）
+  - `xargs head ...`（表示系）
+  - `xargs tail ...`（表示系）
+  - `xargs wc ...`（情報系）
+  - `xargs file ...`（情報系）
+  - `xargs stat ...`（情報系）
+  - `xargs ls ...`（情報系）
+  - `xargs du ...`（情報系）
+  - `xargs md5sum ...`（情報系）
+  - `xargs sha256sum ...`（情報系）
+  - `xargs md5 ...`（情報系、macOS標準）
+  - `xargs shasum ...`（情報系、macOS標準）
 
   ### 危険な操作（deny）
 
   #### 破壊的コマンドとの組み合わせ
   - **xargs rm**: ファイルの削除
   - **xargs rm -rf / xargs rm -r**: ディレクトリの再帰削除
+  - **xargs rmdir**: ディレクトリの削除
+  - **xargs unlink**: ファイルの削除
+  - **xargs shred**: ファイルの完全削除
   - **xargs mv**: ファイルの移動
   - **xargs cp**: ファイルのコピー（書き込みを伴う）
   - **xargs chmod**: パーミッション変更
   - **xargs chown**: オーナー変更
   - **xargs chgrp**: グループ変更
   - **xargs dd**: データ書き込み
-  - **xargs shred**: ファイルの完全削除
   - **xargs truncate**: ファイルの切り詰め
+  - **xargs tee**: ファイルへの書き込み
   - **xargs touch**: ファイルのタイムスタンプ変更・新規作成
   - **xargs mkdir**: ディレクトリの作成
-  - **xargs rmdir**: ディレクトリの削除
   - **xargs ln**: リンクの作成
+  - **xargs mkfifo**: 名前付きパイプの作成
+  - **xargs install**: ファイルのインストール（書き込みを伴う）
+  - **xargs kill**: プロセスへのシグナル送信
+  - **xargs pkill**: プロセスへのシグナル送信
 
   #### シェル経由の実行（原則deny）
   - **xargs sh -c**: シェル経由の任意コマンド実行
   - **xargs bash -c**: シェル経由の任意コマンド実行
   - **xargs zsh -c**: シェル経由の任意コマンド実行
+
+  #### スクリプト経由の実行（原則deny）
+  - **xargs python -c**: スクリプト経由の任意コマンド実行
+  - **xargs perl -e**: スクリプト経由の任意コマンド実行
+  - **xargs ruby -e**: スクリプト経由の任意コマンド実行
 
   #### ファイルの内容を変更するコマンド
   - **xargs sed -i**: ファイルのin-place書き換え
@@ -84,6 +100,7 @@ prompt: |
   - 複合演算子: `&&`, `||`, `;`
   - プロセス置換: `>(...)`, `<(...)`
   - バックグラウンド実行: `&`（単独の場合）
+  - パイプ: `|`（xargs単体呼び出しでパイプを含む複合コマンドは後段が破壊的になるリスクがあるためdeny）
   - パイプエラー転送: `|&`
 
   ### その他
