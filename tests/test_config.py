@@ -23,6 +23,55 @@ class TestBuiltinConfigLoading:
         with pytest.raises(ConfigError, match="Builtin config .* not found"):
             load_builtin_config("nonexistent_config")
 
+    def test_load_builtin_config_validate_find(self) -> None:
+        """ビルトイン設定（validate_find.yaml）が正しく読み込めることを確認"""
+        config = load_builtin_config("validate_find")
+
+        assert "prompt" in config
+        assert isinstance(config["prompt"], str)
+        assert len(config["prompt"]) > 0
+        assert config.get("model") == "haiku"
+
+        # 必須deny語群が含まれること（回帰耐性確保）
+        assert "-delete" in config["prompt"]
+        assert "-execdir" in config["prompt"]
+        assert "sh -c" in config["prompt"]
+        assert "&&" in config["prompt"]
+        assert "|&" in config["prompt"]
+        assert "deny" in config["prompt"]
+        # sort -o はファイル書き込みを伴うためdenyであること（退行防止）
+        assert "sort -o" in config["prompt"]
+
+        # ルール構造見出しが含まれること（構造退行検知）
+        prompt_lower = config["prompt"].lower()
+        assert "allow" in prompt_lower or "ホワイトリスト" in config["prompt"]
+        assert "判断不能" in config["prompt"]
+
+        # 絶対パスを同等コマンドとして許可する旨が記載されていること（退行防止）
+        assert "絶対パス" in config["prompt"]
+
+    def test_load_builtin_config_validate_xargs(self) -> None:
+        """ビルトイン設定（validate_xargs.yaml）が正しく読み込めることを確認"""
+        config = load_builtin_config("validate_xargs")
+
+        assert "prompt" in config
+        assert isinstance(config["prompt"], str)
+        assert len(config["prompt"]) > 0
+        assert config.get("model") == "haiku"
+
+        # 必須deny語群が含まれること（回帰耐性確保）
+        assert "xargs rm" in config["prompt"]
+        assert "xargs chmod" in config["prompt"]
+        assert "sh -c" in config["prompt"]
+        assert "sed -i" in config["prompt"]
+        assert "&&" in config["prompt"]
+        assert "deny" in config["prompt"]
+
+        # ルール構造見出しが含まれること（構造退行検知）
+        prompt_lower = config["prompt"].lower()
+        assert "allow" in prompt_lower or "ホワイトリスト" in config["prompt"]
+        assert "判断不能" in config["prompt"]
+
 
 class TestExternalConfigLoading:
     """Test external YAML configuration loading."""
