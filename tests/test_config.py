@@ -72,6 +72,9 @@ class TestBuiltinConfigLoading:
         assert "allow" in prompt_lower or "ホワイトリスト" in config["prompt"]
         assert "判断不能" in config["prompt"]
 
+        # Git intent-to-add の例外許可が含まれること（回帰耐性確保）
+        assert "git add -N" in config["prompt"]
+
 
 class TestExternalConfigLoading:
     """Test external YAML configuration loading."""

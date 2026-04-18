@@ -103,6 +103,27 @@ prompt: |
   - パイプ: `|`（xargs単体呼び出しでパイプを含む複合コマンドは後段が破壊的になるリスクがあるためdeny）
   - パイプエラー転送: `|&`
 
+  ### Git intent-to-add の例外許可
+
+  以下は破壊的に見えるが、実際にはindexへのエントリ登録のみを行い、ファイル内容のステージングやコミット履歴への影響がないため **例外的に許可（allow）** します。
+
+  #### 許可するパターン（`-N` / `--intent-to-add` 付き）
+  - `xargs git add -N ...`（intent-to-add: indexへのエントリ登録のみ）
+  - `xargs -r git add -N ...`（同上、入力が空なら実行しない）
+  - `xargs -I{} git add -N {}` 等（置換文字列を使う場合も `-N` があれば許可）
+  - `--intent-to-add`（`-N` の long form）も同等として許可
+
+  allow例:
+  - "xargs -r git add -N はindexへのエントリ登録のみでファイル内容はステージしないため安全です"
+
+  #### deny するパターン（`-N` / `--intent-to-add` 無し）
+  - **xargs git add** (`-N` 無し): ファイル内容を実際にステージングする書き込み操作のためdeny
+  - **xargs git add -A** / **xargs git add --all**: 全変更をステージングする破壊的操作のためdeny
+  - **xargs git add -p** / **xargs git add --patch**: インタラクティブなステージングのためdeny
+
+  deny例:
+  - "xargs git add（-N無し）はファイル内容をステージングする書き込み操作です"
+
   ### その他
   - **判断不能**: 上記のどちらにも該当しない場合、または判断が難しい場合は安全を優先して`deny`
 model: haiku
