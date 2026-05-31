@@ -27,13 +27,16 @@ PRETOOLUSE_OUTPUT_SCHEMA = {
                 },
                 "permissionDecision": {
                     "type": "string",
-                    "enum": ["allow", "deny", "ask"]
+                    "enum": ["allow", "deny", "ask", "defer"]
                 },
                 "permissionDecisionReason": {
                     "type": "string"
                 },
                 "updatedInput": {
                     "type": "object"
+                },
+                "additionalContext": {
+                    "type": "string"
                 }
             },
             "additionalProperties": False
@@ -74,7 +77,14 @@ PRETOOLUSE_INPUT_SCHEMA = {
         "cwd": {"type": "string"},
         "permission_mode": {
             "type": "string",
-            "enum": ["default", "plan", "acceptEdits", "bypassPermissions"]
+            "enum": [
+                "default",
+                "plan",
+                "acceptEdits",
+                "auto",
+                "dontAsk",
+                "bypassPermissions"
+            ]
         },
         "hook_event_name": {
             "type": "string",
