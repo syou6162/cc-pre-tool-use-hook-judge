@@ -92,6 +92,40 @@ class TestPreToolUseInputValidation:
         result = validate_pretooluse_input(input_data)
         assert result == input_data
 
+    @pytest.mark.parametrize(
+        "permission_mode",
+        ["default", "plan", "acceptEdits", "auto", "dontAsk", "bypassPermissions"],
+    )
+    def test_valid_permission_modes(self, permission_mode: str) -> None:
+        """Claude Codeがサポートする全permission_mode値でバリデーションが成功することを確認"""
+        input_data = {
+            "session_id": "abc123",
+            "transcript_path": "/Users/test/.claude/projects/test/session.jsonl",
+            "cwd": "/Users/test",
+            "permission_mode": permission_mode,
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls"}
+        }
+
+        result = validate_pretooluse_input(input_data)
+        assert result == input_data
+
+    def test_invalid_permission_mode(self) -> None:
+        """未知のpermission_mode値に対してエラーを返すことを確認"""
+        input_data = {
+            "session_id": "abc123",
+            "transcript_path": "/Users/test/.claude/projects/test/session.jsonl",
+            "cwd": "/Users/test",
+            "permission_mode": "unknownMode",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls"}
+        }
+
+        with pytest.raises(ValueError):
+            validate_pretooluse_input(input_data)
+
     def test_empty_dict_raises_error(self) -> None:
         """空の辞書に対してエラーを返すことを確認"""
         with pytest.raises(ValueError):
@@ -170,6 +204,33 @@ class TestPreToolUseOutputValidation:
                 "updatedInput": {
                     "file_path": "/modified/path.txt"
                 }
+            }
+        }
+
+        result = validate_pretooluse_output(output_data)
+        assert result == output_data
+
+    def test_valid_output_with_defer_decision(self) -> None:
+        """permissionDecisionがdeferの有効な出力に対してバリデーションが成功することを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "defer",
+                "permissionDecisionReason": "Defer to the default permission flow"
+            }
+        }
+
+        result = validate_pretooluse_output(output_data)
+        assert result == output_data
+
+    def test_valid_output_with_additional_context(self) -> None:
+        """additionalContextを含む有効な出力に対してバリデーションが成功することを確認"""
+        output_data = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "Sanitized",
+                "additionalContext": "Command sanitized: added --fix flag"
             }
         }
 
